@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cpp_course/Types.h>
+#include <drone_mapper/Types.h>
 
 namespace drone_mapper {
 

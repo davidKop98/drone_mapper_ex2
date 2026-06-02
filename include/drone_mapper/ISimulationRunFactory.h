@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cpp_course/ISimulationRun.h>
-#include <cpp_course/Types.h>
+#include <drone_mapper/ISimulationRun.h>
+#include <drone_mapper/Types.h>
 
 #include <filesystem>
 #include <memory>

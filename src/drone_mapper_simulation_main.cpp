@@ -1,5 +1,5 @@
-#include <cpp_course/SimulationManager.h>
-#include <cpp_course/SimulationRunFactoryImpl.h>
+#include <drone_mapper/SimulationManager.h>
+#include <drone_mapper/SimulationRunFactoryImpl.h>
 
 #include <filesystem>
 #include <iostream>

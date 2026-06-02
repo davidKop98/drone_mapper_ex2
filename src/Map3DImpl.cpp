@@ -1,4 +1,4 @@
-#include <cpp_course/Map3DImpl.h>
+#include <drone_mapper/Map3DImpl.h>
 
 #include <fstream>
 #include <stdexcept>

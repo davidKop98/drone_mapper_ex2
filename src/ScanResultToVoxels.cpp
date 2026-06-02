@@ -1,4 +1,4 @@
-#include <cpp_course/ScanResultToVoxels.h>
+#include <drone_mapper/ScanResultToVoxels.h>
 
 namespace drone_mapper {
 

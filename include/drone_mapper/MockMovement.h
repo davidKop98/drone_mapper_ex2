@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cpp_course/IDroneMovement.h>
-#include <cpp_course/MockGPS.h>
+#include <drone_mapper/IDroneMovement.h>
+#include <drone_mapper/MockGPS.h>
 
 namespace drone_mapper {
 // Optional implementation for the 

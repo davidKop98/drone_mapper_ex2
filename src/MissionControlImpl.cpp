@@ -1,6 +1,6 @@
-#include <cpp_course/MissionControlImpl.h>
+#include <drone_mapper/MissionControlImpl.h>
 
-#include <cpp_course/MapsComparison.h>
+#include <drone_mapper/MapsComparison.h>
 
 #include <utility>
 

@@ -8,7 +8,7 @@ It **does not** implement the full simulator or mapping solution. You should not
 ## Project Structure
 
 ```text
-include/cpp_course/      Public interfaces, data types, and skeleton classes
+include/drone_mapper/      Public interfaces, data types, and skeleton classes
 src/                     Stub implementations and executable entry points
 data_maps/               Example NumPy voxel maps
 .devcontainer/           Development container setup
@@ -16,8 +16,6 @@ CMakeLists.txt           CMake build configuration
 vcpkg.json               Dependency list
 ```
 
-The public C++ namespace is `drone_mapper`; the include directory keeps the
-current `cpp_course` path for compatibility with the existing handout layout.
 
 ## Building
 

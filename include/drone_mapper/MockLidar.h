@@ -1,8 +1,8 @@
 #pragma once
 
-#include <cpp_course/IGPS.h>
-#include <cpp_course/ILidar.h>
-#include <cpp_course/IMap3D.h>
+#include <drone_mapper/IGPS.h>
+#include <drone_mapper/ILidar.h>
+#include <drone_mapper/IMap3D.h>
 
 namespace drone_mapper {
 

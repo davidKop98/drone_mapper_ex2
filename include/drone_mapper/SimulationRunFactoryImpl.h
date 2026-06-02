@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cpp_course/ISimulationRunFactory.h>
+#include <drone_mapper/ISimulationRunFactory.h>
 
 namespace drone_mapper {
 

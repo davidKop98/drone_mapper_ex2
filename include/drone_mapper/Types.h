@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cpp_course/types/DroneTypes.h>
-#include <cpp_course/types/LidarTypes.h>
-#include <cpp_course/types/MapTypes.h>
-#include <cpp_course/types/MissionTypes.h>
-#include <cpp_course/types/SimulationTypes.h>
+#include <drone_mapper/types/DroneTypes.h>
+#include <drone_mapper/types/LidarTypes.h>
+#include <drone_mapper/types/MapTypes.h>
+#include <drone_mapper/types/MissionTypes.h>
+#include <drone_mapper/types/SimulationTypes.h>

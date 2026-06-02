@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cpp_course/IGPS.h>
+#include <drone_mapper/IGPS.h>
 
 namespace drone_mapper {
 

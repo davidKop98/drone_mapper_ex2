@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cpp_course/IMap3D.h>
+#include <drone_mapper/IMap3D.h>
 
 #include <filesystem>
 

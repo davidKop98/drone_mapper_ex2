@@ -1,6 +1,6 @@
 #pragma once
 
-#include <cpp_course/IMappingAlgorithm.h>
+#include <drone_mapper/IMappingAlgorithm.h>
 
 namespace drone_mapper {
 

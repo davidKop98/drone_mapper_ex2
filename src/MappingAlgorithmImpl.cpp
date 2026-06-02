@@ -1,4 +1,4 @@
-#include <cpp_course/MappingAlgorithmImpl.h>
+#include <drone_mapper/MappingAlgorithmImpl.h>
 
 #include <utility>
 

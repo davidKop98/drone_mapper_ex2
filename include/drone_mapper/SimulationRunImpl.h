@@ -1,14 +1,14 @@
 #pragma once
 
-#include <cpp_course/IDroneControl.h>
-#include <cpp_course/IDroneMovement.h>
-#include <cpp_course/IGPS.h>
-#include <cpp_course/ILidar.h>
-#include <cpp_course/IMap3D.h>
-#include <cpp_course/IMappingAlgorithm.h>
-#include <cpp_course/IMissionControl.h>
-#include <cpp_course/IMutableMap3D.h>
-#include <cpp_course/ISimulationRun.h>
+#include <drone_mapper/IDroneControl.h>
+#include <drone_mapper/IDroneMovement.h>
+#include <drone_mapper/IGPS.h>
+#include <drone_mapper/ILidar.h>
+#include <drone_mapper/IMap3D.h>
+#include <drone_mapper/IMappingAlgorithm.h>
+#include <drone_mapper/IMissionControl.h>
+#include <drone_mapper/IMutableMap3D.h>
+#include <drone_mapper/ISimulationRun.h>
 
 #include <memory>
 

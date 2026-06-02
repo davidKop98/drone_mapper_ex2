@@ -2,7 +2,7 @@
 
 #include <TinyNPY.h>
 
-#include <cpp_course/IMutableMap3D.h>
+#include <drone_mapper/IMutableMap3D.h>
 
 #include <filesystem>
 

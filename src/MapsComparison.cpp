@@ -1,6 +1,6 @@
-#include <cpp_course/MapsComparison.h>
+#include <drone_mapper/MapsComparison.h>
 
-#include <cpp_course/Map3DImpl.h>
+#include <drone_mapper/Map3DImpl.h>
 
 namespace drone_mapper {
 

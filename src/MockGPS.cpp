@@ -1,4 +1,4 @@
-#include <cpp_course/MockGPS.h>
+#include <drone_mapper/MockGPS.h>
 
 namespace drone_mapper {
 

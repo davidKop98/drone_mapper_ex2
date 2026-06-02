@@ -1,4 +1,4 @@
-#include <cpp_course/MapsComparison.h>
+#include <drone_mapper/MapsComparison.h>
 
 #include <exception>
 #include <iostream>

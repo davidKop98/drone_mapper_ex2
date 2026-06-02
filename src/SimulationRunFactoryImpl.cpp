@@ -1,13 +1,13 @@
-#include <cpp_course/SimulationRunFactoryImpl.h>
+#include <drone_mapper/SimulationRunFactoryImpl.h>
 
-#include <cpp_course/DroneControlImpl.h>
-#include <cpp_course/Map3DImpl.h>
-#include <cpp_course/MappingAlgorithmImpl.h>
-#include <cpp_course/MissionControlImpl.h>
-#include <cpp_course/MockGPS.h>
-#include <cpp_course/MockLidar.h>
-#include <cpp_course/MockMovement.h>
-#include <cpp_course/SimulationRunImpl.h>
+#include <drone_mapper/DroneControlImpl.h>
+#include <drone_mapper/Map3DImpl.h>
+#include <drone_mapper/MappingAlgorithmImpl.h>
+#include <drone_mapper/MissionControlImpl.h>
+#include <drone_mapper/MockGPS.h>
+#include <drone_mapper/MockLidar.h>
+#include <drone_mapper/MockMovement.h>
+#include <drone_mapper/SimulationRunImpl.h>
 
 #include <memory>
 
