@@ -3,18 +3,18 @@
 #include <drone_mapper/IMap3D.h>
 #include <drone_mapper/Types.h>
 
-#include <filesystem>
-
 namespace drone_mapper {
+
+struct ResolutionRatio {
+    PhysicalLength numerator;
+    PhysicalLength denominator;
+};
 
 class MapsComparison {
 public:
-    [[nodiscard]] static double compare(const IMap3D& expected,
-                                        const IMap3D& actual,
-                                        PhysicalLength resolution = 1.0 * cm);
-    [[nodiscard]] static double compare(const std::filesystem::path& expected,
-                                        const std::filesystem::path& actual,
-                                        PhysicalLength resolution = 1.0 * cm);
+    [[nodiscard]] static double compare(const IMap3D& map1,
+                                        const IMap3D& map2,
+                                        ResolutionRatio resolution_ratio);
 };
 
 } // namespace drone_mapper

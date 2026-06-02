@@ -24,7 +24,7 @@ types::MissionRunResult MissionControlImpl::runMission() {
     const double score = MapsComparison::compare(
         hidden_map_,
         output_map_,
-        mission_.gps_resolution);
+        ResolutionRatio{hidden_map_.resolution(), output_map_.resolution()});
 
     return types::MissionRunResult{
         types::MissionRunStatus::Error,

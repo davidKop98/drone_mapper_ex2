@@ -47,7 +47,7 @@ logging, and real simulator behavior etc..
 Maps comparison skeleton:
 
 ```bash
-./build/maps_comparison <map1> <map2> [resolution_ratio=<res1>/<res2>]
+./build/maps_comparison <map1_path> <map2_path> [resolution_ratio=<res1>/<res2>]
 ```
 
 The provided `MapsComparison` implementation is only a placeholder. You
