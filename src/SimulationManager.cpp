@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 SimulationManager::SimulationManager(std::unique_ptr<ISimulationRunFactory> run_factory)
     : run_factory_(std::move(run_factory)) {
@@ -12,16 +12,16 @@ SimulationManager::SimulationManager(std::unique_ptr<ISimulationRunFactory> run_
     }
 }
 
-SimulationReport SimulationManager::run(const SimulationCompositionData& composition,
-                                        const std::filesystem::path& output_path) {
-    std::vector<MissionScoreGroup> score_groups;
+types::SimulationReport SimulationManager::run(const types::SimulationCompositionData& composition,
+                                               const std::filesystem::path& output_path) {
+    std::vector<types::MissionScoreGroup> score_groups;
 
-    for (const SimulationConfigData& simulation : composition.simulations) {
-        for (const MissionConfigData& mission : composition.missions) {
-            std::vector<MissionRunResult> results;
+    for (const types::SimulationConfigData& simulation : composition.simulations) {
+        for (const types::MissionConfigData& mission : composition.missions) {
+            std::vector<types::MissionRunResult> results;
 
-            for (const DroneConfigData& drone : composition.drones) {
-                for (const LidarConfigData& lidar : composition.lidars) {
+            for (const types::DroneConfigData& drone : composition.drones) {
+                for (const types::LidarConfigData& lidar : composition.lidars) {
                     std::unique_ptr<ISimulationRun> run =
                         run_factory_->create(simulation, mission, drone, lidar, output_path);
                     results.push_back(run->run());
@@ -31,12 +31,12 @@ SimulationReport SimulationManager::run(const SimulationCompositionData& composi
             score_groups.emplace_back(
                 mission,
                 simulation.map_resolution,
-                ResolutionRequestStatus::Ignored,
+                types::ResolutionRequestStatus::Ignored,
                 std::move(results));
         }
     }
 
-    return SimulationReport{composition.composition_file, "stub", std::move(score_groups)};
+    return types::SimulationReport{composition.composition_file, "stub", std::move(score_groups)};
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper

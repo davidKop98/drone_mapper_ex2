@@ -1,6 +1,6 @@
 #include <cpp_course/MockGPS.h>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 MockGPS::MockGPS(Position3D position, Orientation heading)
     : position_(position), heading_(heading) {}
@@ -21,4 +21,4 @@ void MockGPS::setHeading(Orientation heading) {
     heading_ = heading;
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper

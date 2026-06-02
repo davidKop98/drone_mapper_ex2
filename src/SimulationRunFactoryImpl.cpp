@@ -11,13 +11,13 @@
 
 #include <memory>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 std::unique_ptr<ISimulationRun>
-SimulationRunFactoryImpl::create(const SimulationConfigData& simulation,
-                                 const MissionConfigData& mission,
-                                 const DroneConfigData& drone,
-                                 const LidarConfigData& lidar,
+SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
+                                 const types::MissionConfigData& mission,
+                                 const types::DroneConfigData& drone,
+                                 const types::LidarConfigData& lidar,
                                  const std::filesystem::path& output_path) {
     auto hidden_map = std::make_unique<Map3DImpl>(
         simulation.map_filename,
@@ -31,9 +31,11 @@ SimulationRunFactoryImpl::create(const SimulationConfigData& simulation,
         Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]});
     auto movement = std::make_unique<MockMovement>(*gps);
     auto lidar_impl = std::make_unique<MockLidar>(lidar, *hidden_map, *gps);
-    auto mapping_algorithm = std::make_unique<MappingAlgorithmImpl>();
+    auto mapping_algorithm = std::make_unique<MappingAlgorithmImpl>(mission);
 
     auto drone_control = std::make_unique<DroneControlImpl>(
+        drone,
+        mission,
         *lidar_impl,
         *gps,
         *movement,
@@ -60,4 +62,4 @@ SimulationRunFactoryImpl::create(const SimulationConfigData& simulation,
         std::move(mission_control));
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper

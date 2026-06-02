@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 Map3DImpl::Map3DImpl(const std::filesystem::path& path, PhysicalLength resolution)
     : resolution_(resolution) {
@@ -15,17 +15,21 @@ Map3DImpl::Map3DImpl(const std::filesystem::path& path, PhysicalLength resolutio
     }
 }
 
-Map3DImpl::Map3DImpl(const MappingBounds& bounds, PhysicalLength resolution)
+Map3DImpl::Map3DImpl(const types::MappingBounds& bounds, PhysicalLength resolution)
     : resolution_(resolution) {
     (void)bounds;
 }
 
-VoxelOccupancy Map3DImpl::get(const Position3D& pos) const {
+types::VoxelOccupancy Map3DImpl::get(const Position3D& pos) const {
     (void)pos;
-    return VoxelOccupancy::Unmapped;
+    return types::VoxelOccupancy::Unmapped;
 }
 
-void Map3DImpl::set(const Position3D& pos, VoxelOccupancy value) {
+PhysicalLength Map3DImpl::resolution() const {
+    return resolution_;
+}
+
+void Map3DImpl::set(const Position3D& pos, types::VoxelOccupancy value) {
     (void)pos;
     (void)value;
 }
@@ -37,4 +41,4 @@ void Map3DImpl::save(const std::filesystem::path& path) const {
     }
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper

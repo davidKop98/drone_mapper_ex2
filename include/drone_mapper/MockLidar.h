@@ -4,20 +4,20 @@
 #include <cpp_course/ILidar.h>
 #include <cpp_course/IMap3D.h>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 class MockLidar final : public ILidar {
 public:
-    MockLidar(LidarConfigData config, const IMap3D& map, const IGPS& gps);
+    MockLidar(types::LidarConfigData config, const IMap3D& map, const IGPS& gps);
 
-    [[nodiscard]] LidarScanResult scan(Orientation scan_orientation) const override;
+    [[nodiscard]] types::LidarScanResult scan(Orientation scan_orientation) const override;
 
 private:
     [[nodiscard]] PhysicalLength traceBeam(const Orientation& beam) const;
 
-    LidarConfigData config_;
+    types::LidarConfigData config_;
     const IMap3D& map_;
     const IGPS& gps_;
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

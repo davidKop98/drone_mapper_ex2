@@ -12,7 +12,7 @@
 
 #include <memory>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 class SimulationRunImpl final : public ISimulationRun {
 public:
@@ -25,7 +25,7 @@ public:
                       std::unique_ptr<IDroneControl> drone_control,
                       std::unique_ptr<IMissionControl> mission_control);
 
-    [[nodiscard]] MissionRunResult run() override;
+    [[nodiscard]] types::MissionRunResult run() override;
 
 private:
     std::unique_ptr<const IMap3D> hidden_map_;
@@ -38,4 +38,4 @@ private:
     std::unique_ptr<IMissionControl> mission_control_;
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

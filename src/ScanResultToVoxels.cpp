@@ -1,14 +1,14 @@
 #include <cpp_course/ScanResultToVoxels.h>
 
-namespace cpp_course {
+namespace drone_mapper {
 
-std::vector<MappedVoxel> ScanResultToVoxels::convert(const Position3D& scan_origin,
-                                                     const Orientation& drone_heading,
-                                                     const LidarScanResult& scan) {
+std::vector<types::MappedVoxel> ScanResultToVoxels::convert(const Position3D& scan_origin,
+                                                            const Orientation& drone_heading,
+                                                            const types::LidarScanResult& scan) {
     (void)scan_origin;
     (void)drone_heading;
     (void)scan;
     return {};
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper

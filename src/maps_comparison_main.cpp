@@ -11,7 +11,7 @@ int main(int argc, char** argv) {
     }
 
     try {
-        std::cout << cpp_course::MapsComparison::compare(argv[1], argv[2]) << "\n";
+        std::cout << drone_mapper::MapsComparison::compare(argv[1], argv[2]) << "\n";
     } catch (const std::exception& error) {
         std::cout << "-1\n";
         std::cerr << error.what() << "\n";

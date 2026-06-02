@@ -4,12 +4,13 @@ This document describes the current high-level design of the Assignment 2 refact
 
 ## Main Components
 
-- `SimulationManager` is the top-level runner. It receives typed `SimulationCompositionData`, expands the cartesian product, and aggregates a `SimulationReport`.
+- `SimulationManager` is the top-level runner. It receives `types::SimulationCompositionData`, expands the cartesian product, and aggregates a `types::SimulationReport`.
 - `ISimulationRunFactory` is the single construction seam. It creates one fully wired run node for one simulation/mission/drone/LiDAR combination.
 - `SimulationRunImpl` owns the full per-node runtime object graph, including maps, hardware-like components, drone control, and mission control.
 - `MissionControlImpl` receives references to the simulation-run-owned maps and drone control, saves the output map, and returns the output artifact path.
-- `DroneControlImpl` receives references to simulation-run-owned dependencies and the mutable output map.
-- `IMap3D` is read-only. `IMutableMap3D` adds mutation and saving for output maps.
+- `DroneControlImpl` receives required configs and references to simulation-run-owned dependencies, so it is ready at construction.
+- `IMap3D` is read-only and exposes map resolution. `IMutableMap3D` adds mutation and saving for output maps.
+- Public signatures use explicit `types::...` names from focused headers. `SimulationTypes.h` holds simulator-only composition/report types.
 
 ## Class Diagram
 
@@ -39,7 +40,6 @@ classDiagram
 
     class IDroneControl {
         <<interface>>
-        +initialize(drone, mission) void
         +step() step_result
         +state() state
     }
@@ -64,7 +64,6 @@ classDiagram
 
     class IMappingAlgorithm {
         <<interface>>
-        +initialize(mission) void
         +nextMove(state, latest_scan) command
         +applyVoxelUpdates(voxels) void
     }
@@ -72,6 +71,7 @@ classDiagram
     class IMap3D {
         <<interface>>
         +get(pos) occupancy
+        +resolution() length
     }
 
     class IMutableMap3D {
@@ -115,13 +115,14 @@ classDiagram
     }
 
     class DroneControlImpl {
+        -DroneConfigData drone_
+        -MissionConfigData mission_
         -ILidar& lidar_
         -IGPS& gps_
         -IDroneMovement& movement_
         -IMutableMap3D& output_map_
         -IMappingAlgorithm& mapping_algorithm_
-        +DroneControlImpl(lidar&, gps&, movement&, output_map&, mapping_algorithm&)
-        +initialize(drone, mission) void
+        +DroneControlImpl(drone, mission, lidar&, gps&, movement&, output_map&, mapping_algorithm&)
         +step() step_result
         +state() state
     }
@@ -140,6 +141,7 @@ classDiagram
         +Map3DImpl(path, resolution)
         +Map3DImpl(bounds, resolution)
         +get(pos) occupancy
+        +resolution() length
         +set(pos, value) void
         +save(output_file) void
     }
@@ -235,17 +237,16 @@ sequenceDiagram
     participant Compare as MapsComparison
 
     Run->>Mission: runMission()
-    Mission->>Drone: initialize(drone, mission)
     Note over Run: Future movement legality checks can use run-owned hidden map and movement components.
-    Note over Drone: Current step logic is a stub.
+    Note over Drone: Drone control is ready at construction; current step logic is a stub.
     Mission->>OutputMap: save(output_map_file)
     Mission->>Compare: compare(hidden_map, output_map, resolution)
-    Mission-->>Run: MissionRunResult with output_map_file
+    Mission-->>Run: MissionRunResult
 ```
 
 ## Current Stub Boundaries
 
-The attached stub implementations are examples only. Students should provide their own implementations for:
+The attached stub implementations are examples only. You should provide their own implementations for:
 
 - YAML parsing and composition loading.
 - Mission execution and drone step loops.

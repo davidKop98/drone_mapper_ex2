@@ -5,17 +5,17 @@
 
 #include <memory>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 class SimulationManager final : public ISimulation {
 public:
     explicit SimulationManager(std::unique_ptr<ISimulationRunFactory> run_factory);
 
-    [[nodiscard]] SimulationReport run(const SimulationCompositionData& composition,
-                                       const std::filesystem::path& output_path) override;
+    [[nodiscard]] types::SimulationReport run(const types::SimulationCompositionData& composition,
+                                              const std::filesystem::path& output_path) override;
 
 private:
     std::unique_ptr<ISimulationRunFactory> run_factory_;
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

@@ -1,20 +1,22 @@
 #include <cpp_course/MappingAlgorithmImpl.h>
 
-namespace cpp_course {
+#include <utility>
 
-void MappingAlgorithmImpl::initialize(const MissionConfigData& mission) {
-    mission_ = mission;
-}
+namespace drone_mapper {
 
-MovementCommand MappingAlgorithmImpl::nextMove(const DroneState& state,
-                                               const LidarScanResult& latest_scan) {
+MappingAlgorithmImpl::MappingAlgorithmImpl(types::MissionConfigData mission)
+    : mission_(std::move(mission)) {}
+
+types::MovementCommand MappingAlgorithmImpl::nextMove(const types::DroneState& state,
+                                               const types::LidarScanResult& latest_scan) {
     (void)state;
     (void)latest_scan;
-    return MovementCommand{};
+    (void)mission_;
+    return types::MovementCommand{};
 }
 
-void MappingAlgorithmImpl::applyVoxelUpdates(const std::vector<MappedVoxel>& voxels) {
+void MappingAlgorithmImpl::applyVoxelUpdates(const std::vector<types::MappedVoxel>& voxels) {
     (void)voxels;
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper

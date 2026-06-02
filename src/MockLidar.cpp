@@ -3,8 +3,9 @@
 #include <mp-units/systems/si/math.h>
 
 #include <algorithm>
+#include <limits>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 namespace {
 
@@ -26,11 +27,11 @@ namespace {
 
 } // namespace
 
-MockLidar::MockLidar(LidarConfigData config, const IMap3D& map, const IGPS& gps)
+MockLidar::MockLidar(types::LidarConfigData config, const IMap3D& map, const IGPS& gps)
     : config_(config), map_(map), gps_(gps) {}
 
-LidarScanResult MockLidar::scan(Orientation scan_orientation) const {
-    LidarScanResult results;
+types::LidarScanResult MockLidar::scan(Orientation scan_orientation) const {
+    types::LidarScanResult results;
     if (config_.fov_circles == 0) {
         return results;
     }
@@ -41,7 +42,8 @@ LidarScanResult MockLidar::scan(Orientation scan_orientation) const {
         scan_orientation.altitude + sensor_heading.altitude,
     };
 
-    results.push_back(LidarHit{traceBeam(center_beam_abs), scan_orientation});
+    const PhysicalLength center_distance = traceBeam(center_beam_abs);
+    results.push_back(types::LidarHit{center_distance <= config_.z_max, center_distance, scan_orientation});
 
     for (std::size_t circle = 1; circle < config_.fov_circles; ++circle) {
         const std::size_t beam_count = beams_on_circle(circle);
@@ -64,8 +66,8 @@ LidarScanResult MockLidar::scan(Orientation scan_orientation) const {
                 relative_beam.horizontal + sensor_heading.horizontal,
                 relative_beam.altitude + sensor_heading.altitude,
             };
-            // We said that the lidar always return for each beam, even if it misses (in which case, distance=-1)
-            results.push_back(LidarHit{traceBeam(absolute_beam), relative_beam});
+            const PhysicalLength distance = traceBeam(absolute_beam);
+            results.push_back(types::LidarHit{distance <= config_.z_max, distance, relative_beam});
         }
     }
 
@@ -80,9 +82,9 @@ PhysicalLength MockLidar::traceBeam(const Orientation& beam_orientation) const {
     const auto dz = si::sin(beam_orientation.altitude);
 
     // step based on size of the map's resolution
-    const PhysicalLength step = 0.1 * map_.get_res();
+    const PhysicalLength step = 0.1 * map_.resolution();
 
-    for (PhysicalLength distance = 0; distance <= config_.z_max; distance += step) {
+    for (PhysicalLength distance = 0.0 * cm; distance <= config_.z_max; distance += step) {
         // Computing target voxel position
         const double distance_cm = distance.force_numerical_value_in(cm);
         const double dir_x = dx.force_numerical_value_in(mp::one);
@@ -94,15 +96,14 @@ PhysicalLength MockLidar::traceBeam(const Orientation& beam_orientation) const {
             origin.y + dir_y * distance_cm * y_extent[cm],
             origin.z + dir_z * distance_cm * z_extent[cm],
         };
-        if (map_.get(sample) == VoxelOccupancy::Occupied) {
+        if (map_.get(sample) == types::VoxelOccupancy::Occupied) {
             if (distance < config_.z_min) {
                 return 0.0 * cm;
             }
             return distance;
         }
     }
-    // Beam went past the z_max
-    return -1*cm;
+    return std::numeric_limits<double>::max() * cm;
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper

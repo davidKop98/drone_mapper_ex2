@@ -6,21 +6,21 @@
 
 #include <filesystem>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 class Map3DImpl final : public IMutableMap3D {
 public:
     Map3DImpl(const std::filesystem::path& path, PhysicalLength resolution);
-    Map3DImpl(const MappingBounds& bounds, PhysicalLength resolution);
+    Map3DImpl(const types::MappingBounds& bounds, PhysicalLength resolution);
 
-    [[nodiscard]] VoxelOccupancy get(const Position3D& pos) const override;
-    void set(const Position3D& pos, VoxelOccupancy value) override;
+    [[nodiscard]] types::VoxelOccupancy get(const Position3D& pos) const override;
+    [[nodiscard]] PhysicalLength resolution() const override;
+    void set(const Position3D& pos, types::VoxelOccupancy value) override;
     void save(const std::filesystem::path& path) const override;
-    [[nodiscard]] PhysicalLength getRes() const;
 
 private:
     NpyArray map_;
     PhysicalLength resolution_;
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

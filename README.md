@@ -3,24 +3,7 @@
 This repository is a compilable skeleton for Assignment 2 in the 2026 Advanced
 Topics in Programming course. It intentionally provides interfaces, data types,
 dependency-injected component stubs, and a preserved mock LiDAR implementation.
-It does not implement the full simulator or mapping solution.
-
-## Included Components
-
-- `Units.h` contains the shared physical units, positions, and orientations
-  used by the public interfaces.
-- `Types.h` contains YAML-facing configuration data, scan data, movement
-  commands, run results, and report structs.
-- Mandatory PDF-aligned interfaces are provided for simulation, mission control,
-  drone control, mapping algorithm, LiDAR, GPS, and drone movement.
-- Stub implementations are provided for `SimulationManager`,
-  `SimulationRunFactoryImpl`, `SimulationRunImpl`, `MissionControlImpl`,
-  `DroneControlImpl`, `MappingAlgorithmImpl`, `ScanResultToVoxels`, and
-  `MapsComparison`.
-- `MockLidar` is a real ray-marching mock LiDAR implementation preserved from
-  the starter project and adapted to the new `ILidar`/`IGPS` interfaces.
-- `Map3DImpl` is a placeholder for `.npy` occupancy maps, stores the TinyNPY
-  array, and stores the map resolution supplied during construction.
+It **does not** implement the full simulator or mapping solution. You should not use ANY implementations provided in this repository (aside MockLidar).
 
 ## Project Structure
 
@@ -33,6 +16,9 @@ CMakeLists.txt           CMake build configuration
 vcpkg.json               Dependency list
 ```
 
+The public C++ namespace is `drone_mapper`; the include directory keeps the
+current `cpp_course` path for compatibility with the existing handout layout.
+
 ## Building
 
 ```bash
@@ -43,7 +29,7 @@ cmake --build --preset default
 The main build targets are:
 
 ```text
-cpp_course
+drone_mapper
 drone_mapper_simulation
 maps_comparison
 ```
@@ -57,8 +43,8 @@ Simulator skeleton:
 ```
 
 The skeleton wires explicit placeholder components and reports stub results.
-Students should add YAML parsing, scenario composition, output writing, error
-logging, and real simulator behavior.
+You should add YAML parsing, scenario composition, output writing, error
+logging, and real simulator behavior etc..
 
 Maps comparison skeleton:
 
@@ -66,14 +52,5 @@ Maps comparison skeleton:
 ./build/maps_comparison <map1> <map2> [resolution_ratio=<res1>/<res2>]
 ```
 
-The provided `MapsComparison` implementation is only a placeholder. Students
+The provided `MapsComparison` implementation is only a placeholder. You
 should replace it with the required scoring behavior.
-
-## Student Work
-
-The API signatures were derived from the assignment PDF because the official
-reference stub was not available here. Students should implement the behavior
-behind these contracts: YAML configuration loading, simulation composition
-expansion, mission execution, drone movement decisions, scan-to-voxel mapping,
-map output, score reporting, immediate error logging, component tests, and
-integration tests.

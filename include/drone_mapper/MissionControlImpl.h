@@ -7,26 +7,26 @@
 
 #include <filesystem>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 class MissionControlImpl final : public IMissionControl {
 public:
-    MissionControlImpl(MissionConfigData mission,
-                       DroneConfigData drone,
+    MissionControlImpl(types::MissionConfigData mission,
+                       types::DroneConfigData drone,
                        const IMap3D& hidden_map,
                        IMutableMap3D& output_map,
                        IDroneControl& drone_control,
                        std::filesystem::path output_map_file);
 
-    [[nodiscard]] MissionRunResult runMission() override;
+    [[nodiscard]] types::MissionRunResult runMission() override;
 
 private:
-    MissionConfigData mission_;
-    DroneConfigData drone_;
+    types::MissionConfigData mission_;
+    types::DroneConfigData drone_;
     const IMap3D& hidden_map_;
     IMutableMap3D& output_map_;
     IDroneControl& drone_control_;
     std::filesystem::path output_map_file_;
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

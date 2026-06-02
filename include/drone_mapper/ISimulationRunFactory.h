@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <memory>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 // **Do not change this interface.**
 class ISimulationRunFactory {
@@ -14,11 +14,11 @@ public:
     virtual ~ISimulationRunFactory() = default;
 
     [[nodiscard]] virtual std::unique_ptr<ISimulationRun>
-    create(const SimulationConfigData& simulation,
-           const MissionConfigData& mission,
-           const DroneConfigData& drone,
-           const LidarConfigData& lidar,
+    create(const types::SimulationConfigData& simulation,
+           const types::MissionConfigData& mission,
+           const types::DroneConfigData& drone,
+           const types::LidarConfigData& lidar,
            const std::filesystem::path& output_path) = 0;
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

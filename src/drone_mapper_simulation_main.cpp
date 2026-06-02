@@ -11,40 +11,40 @@ int main(int argc, char** argv) {
     const std::filesystem::path output_path =
         (argc >= 3) ? std::filesystem::path{argv[2]} : std::filesystem::current_path();
 
-    auto run_factory = std::make_unique<cpp_course::SimulationRunFactoryImpl>();
-    cpp_course::SimulationManager simulation{std::move(run_factory)};
+    auto run_factory = std::make_unique<drone_mapper::SimulationRunFactoryImpl>();
+    drone_mapper::SimulationManager simulation{std::move(run_factory)};
 
-    const cpp_course::MappingBounds bounds{
-        -500.0 * cpp_course::x_extent[cpp_course::cm],
-        500.0 * cpp_course::x_extent[cpp_course::cm],
-        -500.0 * cpp_course::y_extent[cpp_course::cm],
-        500.0 * cpp_course::y_extent[cpp_course::cm],
-        0.0 * cpp_course::z_extent[cpp_course::cm],
-        300.0 * cpp_course::z_extent[cpp_course::cm],
+    const drone_mapper::types::MappingBounds bounds{
+        -500.0 * drone_mapper::x_extent[drone_mapper::cm],
+        500.0 * drone_mapper::x_extent[drone_mapper::cm],
+        -500.0 * drone_mapper::y_extent[drone_mapper::cm],
+        500.0 * drone_mapper::y_extent[drone_mapper::cm],
+        0.0 * drone_mapper::z_extent[drone_mapper::cm],
+        300.0 * drone_mapper::z_extent[drone_mapper::cm],
     };
-    cpp_course::SimulationCompositionData composition{
+    drone_mapper::types::SimulationCompositionData composition{
         composition_file,
-        {cpp_course::SimulationConfigData{
+        {drone_mapper::types::SimulationConfigData{
             "data_maps/single_voxel_x2_y4_z2.npy",
-            10.0 * cpp_course::cm,
-            cpp_course::Position3D{},
-            0.0 * cpp_course::horizontal_angle[cpp_course::deg],
+            10.0 * drone_mapper::cm,
+            drone_mapper::Position3D{},
+            0.0 * drone_mapper::horizontal_angle[drone_mapper::deg],
         }},
-        {cpp_course::MissionConfigData{1, bounds, 10.0 * cpp_course::cm, 1}},
-        {cpp_course::DroneConfigData{
-            30.0 * cpp_course::cm,
-            45.0 * cpp_course::horizontal_angle[cpp_course::deg],
-            50.0 * cpp_course::cm,
-            40.0 * cpp_course::cm,
+        {drone_mapper::types::MissionConfigData{1, bounds, 10.0 * drone_mapper::cm, 1}},
+        {drone_mapper::types::DroneConfigData{
+            30.0 * drone_mapper::cm,
+            45.0 * drone_mapper::horizontal_angle[drone_mapper::deg],
+            50.0 * drone_mapper::cm,
+            40.0 * drone_mapper::cm,
         }},
-        {cpp_course::LidarConfigData{
-            20.0 * cpp_course::cm,
-            120.0 * cpp_course::cm,
-            2.5 * cpp_course::cm,
+        {drone_mapper::types::LidarConfigData{
+            20.0 * drone_mapper::cm,
+            120.0 * drone_mapper::cm,
+            2.5 * drone_mapper::cm,
             5,
         }},
     };
-    const cpp_course::SimulationReport report = simulation.run(composition, output_path);
+    const drone_mapper::types::SimulationReport report = simulation.run(composition, output_path);
 
     std::cout << "Assignment 2 simulator skeleton ran "
               << report.simulations.size()

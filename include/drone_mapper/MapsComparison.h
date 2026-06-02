@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 class MapsComparison {
 public:
@@ -17,4 +17,4 @@ public:
                                         PhysicalLength resolution = 1.0 * cm);
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

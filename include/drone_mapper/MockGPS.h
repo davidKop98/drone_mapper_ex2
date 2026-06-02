@@ -2,7 +2,7 @@
 
 #include <cpp_course/IGPS.h>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 class MockGPS final : public IGPS {
 public:
@@ -19,4 +19,4 @@ private:
     Orientation heading_{};
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

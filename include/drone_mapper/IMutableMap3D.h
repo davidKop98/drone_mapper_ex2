@@ -4,15 +4,15 @@
 
 #include <filesystem>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 // **Do not change this interface.**
 class IMutableMap3D : public IMap3D {
 public:
     ~IMutableMap3D() override = default;
 
-    virtual void set(const Position3D& pos, VoxelOccupancy value) = 0;
+    virtual void set(const Position3D& pos, types::VoxelOccupancy value) = 0;
     virtual void save(const std::filesystem::path& path) const = 0;
 };
 
-} // namespace cpp_course
+} // namespace drone_mapper

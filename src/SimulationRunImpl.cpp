@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <utility>
 
-namespace cpp_course {
+namespace drone_mapper {
 
 SimulationRunImpl::SimulationRunImpl(std::unique_ptr<const IMap3D> hidden_map,
                                      std::unique_ptr<IMutableMap3D> output_map,
@@ -33,8 +33,8 @@ SimulationRunImpl::SimulationRunImpl(std::unique_ptr<const IMap3D> hidden_map,
     }
 }
 
-MissionRunResult SimulationRunImpl::run() {
+types::MissionRunResult SimulationRunImpl::run() {
     return mission_control_->runMission();
 }
 
-} // namespace cpp_course
+} // namespace drone_mapper
