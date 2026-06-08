@@ -238,7 +238,7 @@ sequenceDiagram
 
     Run->>Mission: runMission()
     Note over Run: Future movement legality checks can use run-owned hidden map and movement components.
-    Note over Drone: Drone control is ready at construction; current step logic is a stub.
+    Note over Drone: Drone control is ready at construction;
     Mission->>OutputMap: save(output_map_file)
     Mission->>Compare: compare(hidden_map, output_map, resolution)
     Mission-->>Run: MissionRunResult
