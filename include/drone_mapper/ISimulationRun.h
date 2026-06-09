@@ -9,7 +9,8 @@ class ISimulationRun {
 public:
     virtual ~ISimulationRun() = default;
 
-    [[nodiscard]] virtual types::MissionRunResult run() = 0;
+    // Changed: a run now returns simulation-level data, including score and output-map metadata.
+    [[nodiscard]] virtual types::SimulationResult run() = 0;
 };
 
 } // namespace drone_mapper

@@ -11,8 +11,9 @@ class ISimulation {
 public:
     virtual ~ISimulation() = default;
 
-    [[nodiscard]] virtual types::SimulationReport run(const types::SimulationCompositionData& composition,
-                                                      const std::filesystem::path& output_path) = 0;
+    // Changed: the manager now returns the new aggregate report type built from SimulationResult runs.
+    [[nodiscard]] virtual types::SimulationManagerReport run(const types::SimulationCompositionData& composition,
+                                                             const std::filesystem::path& output_path) = 0;
 };
 
 } // namespace drone_mapper

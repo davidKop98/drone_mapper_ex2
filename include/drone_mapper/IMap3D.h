@@ -10,8 +10,10 @@ class IMap3D {
 public:
     virtual ~IMap3D() = default;
 
-    [[nodiscard]] virtual types::VoxelOccupancy get(const Position3D& pos) const = 0;
-    [[nodiscard]] virtual PhysicalLength resolution() const = 0;
+    // Changed: renamed get() to atVoxel() to make it clear callers query a voxel by world position.
+    [[nodiscard]] virtual types::VoxelOccupancy atVoxel(const Position3D& pos) const = 0;
+    // Changed: map resolution/bounds/offset now travel together so offset-aware maps expose one config object.
+    [[nodiscard]] virtual types::MapConfig getMapConfig() const = 0;
 };
 
 } // namespace drone_mapper

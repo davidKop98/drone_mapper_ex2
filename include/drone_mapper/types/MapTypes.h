@@ -11,9 +11,25 @@ enum class VoxelOccupancy {
     Occupied = 1,
 };
 
+// Changed: moved from mission types because map bounds now belong to map configuration.
+struct MappingBounds {
+    XLength min_x{};
+    XLength max_x{};
+    YLength min_y{};
+    YLength max_y{};
+    ZLength min_height{};
+    ZLength max_height{};
+};
+
 struct MappedVoxel {
     Position3D position{};
     VoxelOccupancy value = VoxelOccupancy::Unmapped;
 };
 
+// Changed: added to keep boundaries, offset, and resolution together on IMap3D.
+struct MapConfig {
+    MappingBounds boundaries{};
+    Position3D offset{};
+    PhysicalLength resolution{};
+};
 } // namespace drone_mapper::types

@@ -21,10 +21,13 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
                                  const std::filesystem::path& output_path) {
     auto hidden_map = std::make_unique<Map3DImpl>(
         simulation.map_filename,
-        simulation.map_resolution);
+        simulation.map_resolution,
+        simulation.map_offset);
+    const types::MapConfig hidden_map_config = hidden_map->getMapConfig();
     auto output_map = std::make_unique<Map3DImpl>(
-        mission.boundaries,
-        mission.gps_resolution);
+        hidden_map_config.boundaries,
+        mission.gps_resolution,
+        hidden_map_config.offset);
 
     auto gps = std::make_unique<MockGPS>(
         simulation.initial_drone_position,
@@ -59,7 +62,10 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
         std::move(lidar_impl),
         std::move(mapping_algorithm),
         std::move(drone_control),
-        std::move(mission_control));
+        std::move(mission_control),
+        simulation,
+        mission,
+        output_map_file);
 }
 
 } // namespace drone_mapper

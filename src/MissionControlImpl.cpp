@@ -1,7 +1,5 @@
 #include <drone_mapper/MissionControlImpl.h>
 
-#include <drone_mapper/MapsComparison.h>
-
 #include <utility>
 
 namespace drone_mapper {
@@ -21,17 +19,10 @@ MissionControlImpl::MissionControlImpl(types::MissionConfigData mission,
 
 types::MissionRunResult MissionControlImpl::runMission() {
     output_map_.save(output_map_file_);
-    const double score = MapsComparison::compare(
-        hidden_map_,
-        output_map_,
-        ResolutionRatio{hidden_map_.resolution(), output_map_.resolution()});
-
     return types::MissionRunResult{
         types::MissionRunStatus::Error,
         0,
-        score,
-        output_map_file_,
-        types::ErrorRef{"MISSION_CONTROL_NOT_IMPLEMENTED", "MissionControlImpl::runMission is a stub."},
+        {types::ErrorRef{"MISSION_CONTROL_NOT_IMPLEMENTED", "MissionControlImpl::runMission is a stub."}},
     };
 }
 

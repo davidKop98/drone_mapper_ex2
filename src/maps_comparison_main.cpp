@@ -11,6 +11,7 @@ namespace {
 } // namespace
 
 int main(int argc, char** argv) {
+    (void)argv;
     if (argc < 3 || argc > 4) {
         std::cout << "-1\n";
         std::cerr << "Usage: maps_comparison <map1_path> <map2_path> [resolution_ratio=<res1>/<res2>]\n";

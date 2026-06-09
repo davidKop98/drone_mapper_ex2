@@ -4,13 +4,22 @@ This document describes the current high-level design of the Assignment 2 refact
 
 ## Main Components
 
-- `SimulationManager` is the top-level runner. It receives `types::SimulationCompositionData`, expands the cartesian product, and aggregates a `types::SimulationReport`.
+- `SimulationManager` is the top-level runner. It receives `types::SimulationCompositionData`, expands the cartesian product, and aggregates a `types::SimulationManagerReport`.
 - `ISimulationRunFactory` is the single construction seam. It creates one fully wired run node for one simulation/mission/drone/LiDAR combination.
-- `SimulationRunImpl` owns the full per-node runtime object graph, including maps, hardware-like components, drone control, and mission control.
-- `MissionControlImpl` receives references to the simulation-run-owned maps and drone control, saves the output map, and returns the output artifact path.
+- `SimulationRunImpl` owns the full per-node runtime object graph, including maps, hardware-like components, drone control, and mission control. It also carries the simulation/mission config and output map path needed to return `types::SimulationResult`.
+- `MissionControlImpl` receives references to the simulation-run-owned maps and drone control, saves the output map, and returns mission-level status/errors.
 - `DroneControlImpl` receives required configs and references to simulation-run-owned dependencies, so it is ready at construction.
-- `IMap3D` is read-only and exposes map resolution. `IMutableMap3D` adds mutation and saving for output maps.
+- `IMap3D` is read-only and exposes voxel lookup plus `types::MapConfig`, which groups boundaries, offset, and resolution. `IMutableMap3D` adds mutation and saving for output maps.
 - Public signatures use explicit `types::...` names from focused headers. `SimulationTypes.h` holds simulator-only composition/report types.
+
+## Map Geometry And Results
+
+- `types::MapConfig` is the canonical map-geometry bundle: `MappingBounds`, `Position3D offset`, and `PhysicalLength resolution`.
+- `types::SimulationConfigData` provides the hidden map file, hidden map resolution, map offset, initial drone position, and initial heading.
+- `types::MissionConfigData` no longer owns mapping boundaries. Mission configuration is limited to mission behavior and requested output resolution parameters.
+- `types::MissionRunResult` contains mission status, step count, and mission-level errors.
+- `types::SimulationResult` contains one run's configs, mission results, output map file, output map config, resolution request status, and final score.
+- `types::SimulationManagerReport` is the top-level aggregate over all generated `SimulationResult` runs.
 
 ## Class Diagram
 
@@ -70,8 +79,8 @@ classDiagram
 
     class IMap3D {
         <<interface>>
-        +get(pos) occupancy
-        +resolution() length
+        +atVoxel(pos) occupancy
+        +getMapConfig() config
     }
 
     class IMutableMap3D {
@@ -99,8 +108,11 @@ classDiagram
         -unique_ptr~IMappingAlgorithm~ mapping_algorithm_
         -unique_ptr~IDroneControl~ drone_control_
         -unique_ptr~IMissionControl~ mission_control_
-        +SimulationRunImpl(runtime_objects)
-        +run() result
+        -SimulationConfigData simulation_config_
+        -MissionConfigData mission_config_
+        -path output_map_file_
+        +SimulationRunImpl(runtime_objects, configs, output_file)
+        +run() simulation_result
     }
 
     class MissionControlImpl {
@@ -136,12 +148,13 @@ classDiagram
     }
 
     class Map3DImpl {
-        -NpyArray map_
-        -PhysicalLength resolution_
+        -shared_ptr~NpyArray~ map_
+        -MapConfig config_
         +Map3DImpl(path, resolution)
-        +Map3DImpl(bounds, resolution)
-        +get(pos) occupancy
-        +resolution() length
+        +Map3DImpl(path, resolution, offset)
+        +Map3DImpl(bounds, resolution, offset)
+        +atVoxel(pos) occupancy
+        +getMapConfig() config
         +set(pos, value) void
         +save(output_file) void
     }
@@ -149,6 +162,30 @@ classDiagram
     class MapsComparison {
         +compare(expected&, actual&, resolution) score
         +compare(expected_file, actual_file, resolution) score
+    }
+
+    class MapConfig {
+        +MappingBounds boundaries
+        +Position3D offset
+        +PhysicalLength resolution
+    }
+
+    class SimulationResult {
+        +SimulationConfigData simulation_config
+        +MissionConfigData mission_config
+        +ResolutionRequestStatus resolution_request_status
+        +vector~MissionRunResult~ mission_results
+        +path output_map_file
+        +MapConfig output_map_config
+        +double mission_score
+    }
+
+    class SimulationManagerReport {
+        +string generated_at_utc
+        +string metric
+        +tuple~double,double~ score_range
+        +int error_score
+        +vector~SimulationResult~ runs
     }
 
     ISimulation <|.. SimulationManager
@@ -180,6 +217,11 @@ classDiagram
     DroneControlImpl --> IMappingAlgorithm : reference
     MockLidar --> IMap3D : hidden map reference
     MapsComparison --> IMap3D
+    IMap3D --> MapConfig
+    SimulationRunImpl --> SimulationResult
+    SimulationManager --> SimulationManagerReport
+    SimulationManagerReport --> SimulationResult
+    SimulationResult --> MapConfig
 ```
 
 ## Top-Level Run Flow
@@ -199,9 +241,9 @@ sequenceDiagram
         Manager->>Factory: create(simulation, mission, drone, lidar, output_path)
         Factory-->>Manager: fully wired SimulationRunImpl
         Manager->>Run: run()
-        Run-->>Manager: MissionRunResult
+        Run-->>Manager: SimulationResult
     end
-    Manager-->>Main: SimulationReport
+    Manager-->>Main: SimulationManagerReport
 ```
 
 ## Factory Wiring Flow
@@ -217,13 +259,15 @@ sequenceDiagram
     participant GPS as MockGPS
     participant Lidar as MockLidar
 
-    Factory->>Hidden: create unique_ptr
-    Factory->>Output: create unique_ptr
+    Factory->>Hidden: create unique_ptr with path, resolution, offset
+    Factory->>Hidden: getMapConfig()
+    Hidden-->>Factory: hidden map config
+    Factory->>Output: create unique_ptr with bounds, output resolution, offset
     Factory->>GPS: create unique_ptr
     Factory->>Lidar: construct with Hidden and GPS references
     Factory->>Drone: construct with component references
     Factory->>Mission: construct with map and drone-control references
-    Factory->>Run: transfer ownership of all objects
+    Factory->>Run: transfer ownership plus configs/output path
 ```
 
 ## Mission Output Map Flow
@@ -240,8 +284,9 @@ sequenceDiagram
     Note over Run: Future movement legality checks can use run-owned hidden map and movement components.
     Note over Drone: Drone control is ready at construction;
     Mission->>OutputMap: save(output_map_file)
-    Mission->>Compare: compare(hidden_map, output_map, resolution)
     Mission-->>Run: MissionRunResult
+    Run->>Compare: compare(hidden_map, output_map, map config resolutions)
+    Run-->>Run: assemble SimulationResult with score, output path, and output MapConfig
 ```
 
 ## Current Stub Boundaries
