@@ -150,9 +150,8 @@ classDiagram
     class Map3DImpl {
         -shared_ptr~NpyArray~ map_
         -MapConfig config_
-        +Map3DImpl(path, resolution)
-        +Map3DImpl(path, resolution, offset)
-        +Map3DImpl(bounds, resolution, offset)
+        +Map3DImpl(shared_ptr~NpyArray~ map_ptr)
+        +Map3DImpl(shared_ptr~NpyArray~ map_ptr, MapConfig config)
         +atVoxel(pos) occupancy
         +getMapConfig() config
         +set(pos, value) void
@@ -160,8 +159,7 @@ classDiagram
     }
 
     class MapsComparison {
-        +compare(expected&, actual&, resolution) score
-        +compare(expected_file, actual_file, resolution) score
+        +compare(origin&, vector~IMap3D*~ targets) vector~double~
     }
 
     class MapConfig {
@@ -259,10 +257,9 @@ sequenceDiagram
     participant GPS as MockGPS
     participant Lidar as MockLidar
 
-    Factory->>Hidden: create unique_ptr with path, resolution, offset
-    Factory->>Hidden: getMapConfig()
-    Hidden-->>Factory: hidden map config
-    Factory->>Output: create unique_ptr with bounds, output resolution, offset
+    Factory->>Factory: load hidden NpyArray from simulation.map_filename
+    Factory->>Hidden: create unique_ptr with shared NpyArray and hidden MapConfig
+    Factory->>Output: create unique_ptr with empty shared NpyArray and output MapConfig
     Factory->>GPS: create unique_ptr
     Factory->>Lidar: construct with Hidden and GPS references
     Factory->>Drone: construct with component references
@@ -285,7 +282,7 @@ sequenceDiagram
     Note over Drone: Drone control is ready at construction;
     Mission->>OutputMap: save(output_map_file)
     Mission-->>Run: MissionRunResult
-    Run->>Compare: compare(hidden_map, output_map, map config resolutions)
+    Run->>Compare: compare(hidden_map, {output_map})
     Run-->>Run: assemble SimulationResult with score, output path, and output MapConfig
 ```
 

@@ -2,26 +2,19 @@
 
 #include <fstream>
 #include <stdexcept>
-#include <string>
+#include <utility>
 
 namespace drone_mapper {
 
-Map3DImpl::Map3DImpl(const std::filesystem::path& path, PhysicalLength resolution)
-    : Map3DImpl(path, resolution, Position3D{}) {}
+Map3DImpl::Map3DImpl(std::shared_ptr<NpyArray> map_ptr)
+    : Map3DImpl(std::move(map_ptr), types::MapConfig{}) {}
 
-Map3DImpl::Map3DImpl(const std::filesystem::path& path, PhysicalLength resolution, Position3D offset)
-    : map_(std::make_shared<NpyArray>()),
-      config_{types::MappingBounds{}, offset, resolution} {
-    const std::string path_string = path.string();
-    const char* error = map_->LoadNPY(path_string.c_str());
-    if (error != nullptr) {
-        throw std::runtime_error(std::string("Failed to load NPY file: ") + error);
+Map3DImpl::Map3DImpl(std::shared_ptr<NpyArray> map_ptr, const types::MapConfig map_config)
+    : map_(std::move(map_ptr)),
+      config_(map_config) {
+    if (!map_) {
+        throw std::invalid_argument("Map3DImpl requires a valid map pointer.");
     }
-}
-
-Map3DImpl::Map3DImpl(const types::MappingBounds& bounds, PhysicalLength resolution, Position3D offset)
-    : map_(std::make_shared<NpyArray>()),
-      config_{bounds, offset, resolution} {
 }
 
 types::VoxelOccupancy Map3DImpl::atVoxel(const Position3D& pos) const {

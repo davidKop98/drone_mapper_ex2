@@ -27,6 +27,7 @@ struct MappedVoxel {
 };
 
 // Changed: added to keep boundaries, offset, and resolution together on IMap3D.
+// Note - IMap3D should be able to construct with a default MapConfig (aka no MapConfig. See Map3DImpl.h).
 struct MapConfig {
     MappingBounds boundaries{};
     Position3D offset{};

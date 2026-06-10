@@ -2,7 +2,7 @@
 
 #include <drone_mapper/IMap3D.h>
 #include <drone_mapper/Types.h>
-
+#include <vector>
 namespace drone_mapper {
 
 class MapsComparison {
