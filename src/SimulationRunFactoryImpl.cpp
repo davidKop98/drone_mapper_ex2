@@ -24,10 +24,10 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
 
     auto gps = std::make_unique<MockGPS>(
         simulation.initial_drone_position,
-        Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]});
+        Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]},mission.gps_resolution);
     auto movement = std::make_unique<MockMovement>(*gps);
     auto lidar_impl = std::make_unique<MockLidar>(lidar, *hidden_map, *gps);
-    auto mapping_algorithm = std::make_unique<MappingAlgorithmImpl>(drone, *output_map);
+    auto mapping_algorithm = std::make_unique<MappingAlgorithmImpl>(mission,lidar,drone, *output_map);
 
     auto drone_control = std::make_unique<DroneControlImpl>(
         drone,

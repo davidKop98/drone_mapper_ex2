@@ -5,6 +5,7 @@
 namespace drone_mapper::types {
 
 enum class VoxelOccupancy {
+    PotentiallyOccupied = -3,
     OutOfBounds = -2,
     Unmapped = -1,
     Empty = 0,

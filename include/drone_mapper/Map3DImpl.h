@@ -18,6 +18,7 @@ public:
     [[nodiscard]] types::VoxelOccupancy atVoxel(const Position3D& pos) const override;
     // Changed: exposes boundaries, offset, and resolution as one map-owned configuration.
     [[nodiscard]] types::MapConfig getMapConfig() const override;
+    [[nodiscard]] bool isInBounds(const Position3D& pos) const override;
 
     //Mutable map methods
     void set(const Position3D& pos, types::VoxelOccupancy value) override;

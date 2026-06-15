@@ -26,6 +26,11 @@ types::MapConfig Map3DImpl::getMapConfig() const {
     return config_;
 }
 
+bool Map3DImpl::isInBounds(const Position3D& pos) const {
+    (void)pos;
+    return false;
+}
+
 void Map3DImpl::set(const Position3D& pos, types::VoxelOccupancy value) {
     (void)pos;
     (void)value;

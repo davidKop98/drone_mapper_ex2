@@ -6,7 +6,7 @@ namespace drone_mapper {
 
 class MockGPS final : public IGPS {
 public:
-    MockGPS(Position3D position, Orientation heading);
+    MockGPS(Position3D position, Orientation heading, PhysicalLength resolution);
 
     [[nodiscard]] Position3D position() const override;
     [[nodiscard]] Orientation heading() const override;
@@ -17,6 +17,7 @@ public:
 private:
     Position3D position_{};
     Orientation heading_{};
+    PhysicalLength resolution_{};
 };
 
 } // namespace drone_mapper

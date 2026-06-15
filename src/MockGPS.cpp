@@ -2,8 +2,8 @@
 
 namespace drone_mapper {
 
-MockGPS::MockGPS(Position3D position, Orientation heading)
-    : position_(position), heading_(heading) {}
+MockGPS::MockGPS(Position3D position, Orientation heading, PhysicalLength resolution)
+    : position_(position), heading_(heading), resolution_(resolution) {}
 
 Position3D MockGPS::position() const {
     return position_;

@@ -12,9 +12,14 @@ class IMap3D;
 class IMappingAlgorithm {
 public:
     virtual ~IMappingAlgorithm() = default;
-    IMappingAlgorithm(const types::DroneConfigData drone_config, const IMap3D& output_map)
-        : _drone_config(drone_config),
-          _output_map(output_map) {}
+    IMappingAlgorithm(const types::MissionConfigData& mission_config,
+                    const types::LidarConfigData& lidar_config,
+                    const types::DroneConfigData& drone_config,
+                    const IMap3D& output_map)
+        : mission_config_(mission_config),
+          lidar_config_(lidar_config),
+          drone_config_(drone_config),
+          output_map_(output_map){}
     [[nodiscard]] virtual types::MappingStepCommand nextStep(const types::DroneState& state,
                                                              const types::LidarScanResult* latest_scan) = 0; // latest_scan can be a null pointer!
     // Signature changes 
@@ -23,9 +28,10 @@ public:
 
 // Added in 12.6
 protected:
-    const types::DroneConfigData _drone_config;
-    const IMap3D& _output_map;
-    
+    const types::MissionConfigData mission_config_;
+    const types::LidarConfigData lidar_config_;
+    const types::DroneConfigData drone_config_;
+    const IMap3D& output_map_;
 };
 
 } // namespace drone_mapper

@@ -17,7 +17,7 @@ struct LidarConfigData {
 struct LidarHit {
     // Misses use max double centimeters;
     PhysicalLength distance{};
-    Orientation angle{};
+    Orientation angle{}; // relative angle 
 };
 
 using LidarScanResult = std::vector<LidarHit>;
