@@ -22,9 +22,12 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
     auto hidden_map = std::make_unique<Map3DImpl>(std::make_shared<NpyArray>());
     auto output_map = std::make_unique<Map3DImpl>(std::make_shared<NpyArray>());
 
+    // Exact view (resolution <= 0) so the lidar/movement see the true pose.
+    // Step 5 will add a gps_resolution-rounded sibling view over the same truth
+    // for the drone/algorithm to observe.
     auto gps = std::make_unique<MockGPS>(
         simulation.initial_drone_position,
-        Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]},mission.gps_resolution);
+        Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]}, 0.0 * cm);
     auto movement = std::make_unique<MockMovement>(*gps);
     auto lidar_impl = std::make_unique<MockLidar>(lidar, *hidden_map, *gps);
     auto mapping_algorithm = std::make_unique<MappingAlgorithmImpl>(mission,lidar,drone, *output_map);
