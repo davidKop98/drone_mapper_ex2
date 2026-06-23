@@ -100,12 +100,12 @@ double MappingAlgorithmImpl::moveStepCm() const {
 double MappingAlgorithmImpl::clearanceCm() const {
     const double radius = drone_config_.radius.force_numerical_value_in(cm);
     const double gps = mission_config_.gps_resolution.force_numerical_value_in(cm);
-    return std::max(0.0, radius) + 0.5 * std::max(0.0, gps);
+    return std::max(0.0, radius) + 0.5 * std::max(0.0, gps); //might need to make 0.5 to 1 to be safe
 }
 
 double MappingAlgorithmImpl::stepAngleDeg() const {
-    constexpr double kMaxStep = 5.0;
-    constexpr double kMinStep = 1.0;
+    constexpr double kMaxStep = 10.0; //might need to change these 2 values for efficiency
+    constexpr double kMinStep = 2.0;
     const double spacing = lidar_config_.d.force_numerical_value_in(cm);
     const double beam_min = lidar_config_.z_min.force_numerical_value_in(cm);
     if (spacing <= 0.0 || beam_min <= 0.0) return kMaxStep;
@@ -138,7 +138,7 @@ bool MappingAlgorithmImpl::isEmptyCell(const Position3D& pos) const {
 // overlaps wall OR unknown space -- it scans from a standoff to confirm space Empty,
 // then advances into it. Sampled as a per-axis box so the margin holds on every axis.
 bool MappingAlgorithmImpl::hasClearance(const Position3D& center) const {
-    const double c = clearanceCm();
+    const double c = clearanceCm(); //The radius we are checking
     if (c <= 0.0) return true;
     const double half_cell = 0.5 * moveStepCm();
     const int n = std::max(1, static_cast<int>(std::ceil(c / std::max(half_cell, 1e-9))));

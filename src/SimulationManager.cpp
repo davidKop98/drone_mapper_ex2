@@ -16,8 +16,8 @@ types::SimulationManagerReport SimulationManager::run(const types::SimulationCom
                                                       const std::filesystem::path& output_path) {
     std::vector<types::SimulationResult> runs;
 
-    for (const types::SimulationConfigData& simulation : composition.simulations) {
-        for (const types::MissionConfigData& mission : composition.missions) {
+    for (const auto& [simulation, missions] : composition.simulation_mission_groups) {
+        for (const types::MissionConfigData& mission : missions) {
             for (const types::DroneConfigData& drone : composition.drones) {
                 for (const types::LidarConfigData& lidar : composition.lidars) {
                     std::unique_ptr<ISimulationRun> run =

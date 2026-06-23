@@ -11,6 +11,8 @@ public:
     MockLidar(types::LidarConfigData config, const IMap3D& map, const IGPS& gps);
 
     [[nodiscard]] types::LidarScanResult scan(Orientation scan_orientation) const override;
+    // Change: 20.6 - added a config getter
+    [[nodiscard]] types::LidarConfigData config() const override;
 
 private:
     [[nodiscard]] PhysicalLength traceBeam(const Orientation& beam) const;

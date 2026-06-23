@@ -22,21 +22,23 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
     auto hidden_map = std::make_unique<Map3DImpl>(std::make_shared<NpyArray>());
     auto output_map = std::make_unique<Map3DImpl>(std::make_shared<NpyArray>());
 
-    // Exact view (resolution <= 0) so the lidar/movement see the true pose.
-    // Step 5 will add a gps_resolution-rounded sibling view over the same truth
-    // for the drone/algorithm to observe.
-    auto gps = std::make_unique<MockGPS>(
+    // One shared exact truth with two views: the exact view (resolution <= 0) feeds the
+    // lidar/movement (true pose); the rounded view (gps_resolution) is what the drone and
+    // algorithm observe.
+    auto exact_gps = std::make_unique<MockGPS>(
         simulation.initial_drone_position,
         Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]}, 0.0 * cm);
-    auto movement = std::make_unique<MockMovement>(*gps);
-    auto lidar_impl = std::make_unique<MockLidar>(lidar, *hidden_map, *gps);
-    auto mapping_algorithm = std::make_unique<MappingAlgorithmImpl>(mission,lidar,drone, *output_map);
+    auto rounded_gps = std::make_unique<MockGPS>(exact_gps->truth(), mission.gps_resolution);
+
+    auto movement = std::make_unique<MockMovement>(*exact_gps, *hidden_map, drone.radius);
+    auto lidar_impl = std::make_unique<MockLidar>(lidar, *hidden_map, *exact_gps);
+    auto mapping_algorithm = std::make_unique<MappingAlgorithmImpl>(mission, lidar, drone, *output_map);
 
     auto drone_control = std::make_unique<DroneControlImpl>(
-        drone,
-        mission,
+        lidar,
         *lidar_impl,
-        *gps,
+        *rounded_gps,
+        *exact_gps,
         *movement,
         *output_map,
         *mapping_algorithm);
@@ -53,7 +55,8 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
     return std::make_unique<SimulationRunImpl>(
         std::move(hidden_map),
         std::move(output_map),
-        std::move(gps),
+        std::move(exact_gps),
+        std::move(rounded_gps),
         std::move(movement),
         std::move(lidar_impl),
         std::move(mapping_algorithm),

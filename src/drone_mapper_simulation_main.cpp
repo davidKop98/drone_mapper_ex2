@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <tuple>
+#include <vector>
 
 int main(int argc, char** argv) {
     const std::filesystem::path composition_file =
@@ -16,14 +18,16 @@ int main(int argc, char** argv) {
 
     drone_mapper::types::SimulationCompositionData composition{
         composition_file,
-        {drone_mapper::types::SimulationConfigData{
-            "data_maps/single_voxel_x2_y4_z2.npy",
-            10.0 * drone_mapper::cm,
-            drone_mapper::Position3D{},
-            drone_mapper::Position3D{},
-            0.0 * drone_mapper::horizontal_angle[drone_mapper::deg],
+        {std::tuple{
+            drone_mapper::types::SimulationConfigData{
+                "data_maps/single_voxel_x2_y4_z2.npy",
+                10.0 * drone_mapper::cm,
+                drone_mapper::Position3D{},
+                drone_mapper::Position3D{},
+                0.0 * drone_mapper::horizontal_angle[drone_mapper::deg],
+            },
+            std::vector{drone_mapper::types::MissionConfigData{1, 10.0 * drone_mapper::cm, 1}},
         }},
-        {drone_mapper::types::MissionConfigData{1, 10.0 * drone_mapper::cm, 1}},
         {drone_mapper::types::DroneConfigData{
             30.0 * drone_mapper::cm,
             45.0 * drone_mapper::horizontal_angle[drone_mapper::deg],

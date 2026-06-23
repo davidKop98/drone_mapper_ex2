@@ -23,8 +23,8 @@ struct SimulationConfigData {
 
 struct SimulationCompositionData {
     std::filesystem::path composition_file;
-    std::vector<SimulationConfigData> simulations;
-    std::vector<MissionConfigData> missions;
+    // 20.6 - added nested structure to enable correct Composition configuration
+    std::vector<std::tuple<SimulationConfigData, std::vector<MissionConfigData>>> simulation_mission_groups;
     std::vector<DroneConfigData> drones;
     std::vector<LidarConfigData> lidars;
 };

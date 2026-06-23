@@ -13,6 +13,8 @@ struct MissionConfigData {
     std::size_t max_steps = 0;
     PhysicalLength gps_resolution{};
     double output_mapping_resolution_factor = 0;
+    // 20.6 - readded the map boundaries to the MissionConfig for outputting
+    MappingBounds mission_bounds{};
 };
 
 enum class MissionRunStatus {

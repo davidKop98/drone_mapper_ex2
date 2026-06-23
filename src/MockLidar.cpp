@@ -30,6 +30,10 @@ namespace {
 MockLidar::MockLidar(types::LidarConfigData config, const IMap3D& map, const IGPS& gps)
     : config_(config), map_(map), gps_(gps) {}
 
+types::LidarConfigData MockLidar::config() const{
+    return config_;
+}
+
 types::LidarScanResult MockLidar::scan(Orientation scan_orientation) const {
     types::LidarScanResult results;
     if (config_.fov_circles == 0) {

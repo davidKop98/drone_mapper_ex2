@@ -26,7 +26,7 @@ namespace drone_mapper {
 // crash as-true.
 class MappingAlgorithmImpl final : public IMappingAlgorithm {
 public:
-    using IMappingAlgorithm::IMappingAlgorithm; // locked ctor (mission, lidar, drone, output_map)
+    using IMappingAlgorithm::IMappingAlgorithm; // locked ctor (mission, lidar_config, drone_config, output_map)
 
     [[nodiscard]] types::MappingStepCommand nextStep(const types::DroneState& state,
                                                      const types::LidarScanResult* latest_scan) override;

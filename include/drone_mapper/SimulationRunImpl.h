@@ -19,7 +19,8 @@ class SimulationRunImpl final : public ISimulationRun {
 public:
     SimulationRunImpl(std::unique_ptr<const IMap3D> hidden_map,
                       std::unique_ptr<IMutableMap3D> output_map,
-                      std::unique_ptr<IGPS> gps,
+                      std::unique_ptr<IGPS> exact_gps,
+                      std::unique_ptr<IGPS> rounded_gps,
                       std::unique_ptr<IDroneMovement> movement,
                       std::unique_ptr<ILidar> lidar,
                       std::unique_ptr<IMappingAlgorithm> mapping_algorithm,
@@ -36,7 +37,8 @@ public:
 private:
     std::unique_ptr<const IMap3D> hidden_map_;
     std::unique_ptr<IMutableMap3D> output_map_;
-    std::unique_ptr<IGPS> gps_;
+    std::unique_ptr<IGPS> exact_gps_;
+    std::unique_ptr<IGPS> rounded_gps_;
     std::unique_ptr<IDroneMovement> movement_;
     std::unique_ptr<ILidar> lidar_;
     std::unique_ptr<IMappingAlgorithm> mapping_algorithm_;

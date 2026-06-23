@@ -64,6 +64,8 @@ add_executable(drone_mapper_simulation_test
     tests/components/MockLidarTest.cpp
     tests/components/ScanResultToVoxelsTest.cpp
     tests/components/MappingAlgorithmTest.cpp
+    tests/components/DroneControlTest.cpp
+    tests/components/MissionControlTest.cpp
 )
 target_link_libraries(drone_mapper_simulation_test
     PRIVATE
