@@ -29,7 +29,8 @@ public:
                       // Changed: stores run metadata needed to build SimulationResult.
                       types::SimulationConfigData simulation_config,
                       types::MissionConfigData mission_config,
-                      std::filesystem::path output_map_file);
+                      std::filesystem::path output_map_file,
+                      types::ResolutionRequestStatus resolution_request_status);
 
     // Changed: matches ISimulationRun's new simulation-level result.
     [[nodiscard]] types::SimulationResult run() override;
@@ -48,6 +49,7 @@ private:
     types::SimulationConfigData simulation_config_;
     types::MissionConfigData mission_config_;
     std::filesystem::path output_map_file_;
+    types::ResolutionRequestStatus resolution_request_status_;
 };
 
 } // namespace drone_mapper

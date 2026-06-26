@@ -5,16 +5,19 @@
 #include <drone_mapper/MappingAlgorithmImpl.h>
 #include <drone_mapper/MockGPS.h>
 #include <drone_mapper/MockMovement.h>
+#include <drone_mapper/SimulationRunFactoryImpl.h>
 #include <drone_mapper/Units.h>
 #include <drone_mapper/types/DroneTypes.h>
 #include <drone_mapper/types/LidarTypes.h>
 #include <drone_mapper/types/MapTypes.h>
 #include <drone_mapper/types/MissionTypes.h>
+#include <drone_mapper/types/SimulationTypes.h>
 
 #include <gtest/gtest.h>
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 
 namespace {
@@ -236,4 +239,144 @@ TEST(SimulationRun, MovementParityWithAlgorithmClearance) {
     const MovementResult moved = mover.advance(dist * cm);
     EXPECT_TRUE(moved.success);            // no false crash
     EXPECT_GT(X(exact.position()), 35.0);  // advanced along +x
+}
+
+// ---- Factory: real .npy + MapConfig construction ------------------------------
+
+namespace {
+// Write a 5x5x5 hidden .npy with one Occupied voxel at index [2][3][1], return its path.
+std::filesystem::path writeHiddenNpy(const char* name) {
+    auto arr = makeArray(5, 5, 5, 0);                       // all Empty (0)
+    arr->Data<std::uint8_t>()[2 * 5 * 5 + 3 * 5 + 1] = 1;   // voxel (2,3,1) Occupied
+    const std::filesystem::path path = std::filesystem::temp_directory_path() / name;
+    EXPECT_EQ(arr->SaveNPY(path.string()), nullptr);
+    return path;
+}
+MappingBounds boundsBox(double min_x, double max_x, double min_y, double max_y, double min_z, double max_z) {
+    return MappingBounds{
+        min_x * x_extent[cm], max_x * x_extent[cm],
+        min_y * y_extent[cm], max_y * y_extent[cm],
+        min_z * z_extent[cm], max_z * z_extent[cm],
+    };
+}
+} // namespace
+
+// Hidden map: a known Occupied voxel reads Occupied through the built map; config carries
+// the resolution and full-extent boundaries.
+TEST(SimulationRun, FactoryLoadsHiddenMapWithResolution) {
+    const std::filesystem::path path = writeHiddenNpy("dm_hidden_load.npy");
+    SimulationConfigData sim;
+    sim.map_filename = path;
+    sim.map_resolution = 10.0 * cm;
+    sim.map_offset = P(0, 0, 0);
+
+    auto hidden = SimulationRunFactoryImpl::loadHiddenMap(sim);
+    EXPECT_EQ(hidden->atVoxel(P(25, 35, 15)), VoxelOccupancy::Occupied); // voxel (2,3,1) center
+    EXPECT_EQ(hidden->atVoxel(P(5, 5, 5)), VoxelOccupancy::Empty);       // voxel (0,0,0)
+
+    const MapConfig cfg = hidden->getMapConfig();
+    EXPECT_DOUBLE_EQ(cfg.resolution.force_numerical_value_in(cm), 10.0);
+    EXPECT_DOUBLE_EQ(cfg.boundaries.max_x.force_numerical_value_in(cm), 50.0); // 5 * 10
+    std::filesystem::remove(path);
+}
+
+// Hidden map: offset shifts where each voxel lives in world space.
+TEST(SimulationRun, FactoryHiddenMapHonorsOffset) {
+    const std::filesystem::path path = writeHiddenNpy("dm_hidden_offset.npy");
+    SimulationConfigData sim;
+    sim.map_filename = path;
+    sim.map_resolution = 10.0 * cm;
+    sim.map_offset = P(-50, -50, -50); // world extent now [-50, 0) per axis
+
+    auto hidden = SimulationRunFactoryImpl::loadHiddenMap(sim);
+    EXPECT_EQ(hidden->atVoxel(P(-25, -15, -35)), VoxelOccupancy::Occupied); // voxel (2,3,1)
+    EXPECT_TRUE(hidden->isInBounds(P(-25, -15, -35)));
+    EXPECT_FALSE(hidden->isInBounds(P(0, 0, 0))); // outside [-50, 0)
+    std::filesystem::remove(path);
+}
+
+// Output map: starts all-Unmapped over the box, isInBounds matches the box, and the
+// mission bounds land on the output MapConfig with offset = bounds.min.
+TEST(SimulationRun, FactoryOutputMapAllUnmappedOverBox) {
+    auto output = SimulationRunFactoryImpl::makeOutputMap(boundsBox(0, 70, 0, 70, 0, 70), 10.0 * cm);
+
+    EXPECT_EQ(output->atVoxel(P(5, 5, 5)), VoxelOccupancy::Unmapped);
+    EXPECT_EQ(output->atVoxel(P(65, 65, 65)), VoxelOccupancy::Unmapped);
+    EXPECT_TRUE(output->isInBounds(P(0, 0, 0)));
+    EXPECT_TRUE(output->isInBounds(P(69, 69, 69)));
+    EXPECT_FALSE(output->isInBounds(P(70, 0, 0)));
+    EXPECT_FALSE(output->isInBounds(P(-1, 0, 0)));
+
+    const MapConfig cfg = output->getMapConfig();
+    EXPECT_DOUBLE_EQ(cfg.boundaries.min_x.force_numerical_value_in(cm), 0.0);
+    EXPECT_DOUBLE_EQ(cfg.boundaries.max_x.force_numerical_value_in(cm), 70.0);
+    EXPECT_DOUBLE_EQ(cfg.offset.x.force_numerical_value_in(cm), 0.0);
+    EXPECT_DOUBLE_EQ(cfg.resolution.force_numerical_value_in(cm), 10.0);
+}
+
+// Output map: a non-zero-min box snaps offset to bounds.min.
+TEST(SimulationRun, FactoryOutputMapOffsetIsBoundsMin) {
+    auto output = SimulationRunFactoryImpl::makeOutputMap(boundsBox(-20, 30, -20, 30, 0, 40), 10.0 * cm);
+    const MapConfig cfg = output->getMapConfig();
+    EXPECT_DOUBLE_EQ(cfg.offset.x.force_numerical_value_in(cm), -20.0);
+    EXPECT_DOUBLE_EQ(cfg.offset.z.force_numerical_value_in(cm), 0.0);
+    EXPECT_TRUE(output->isInBounds(P(-20, -20, 0)));         // min corner in bounds
+    EXPECT_FALSE(output->isInBounds(P(30, 0, 0)));           // max edge OOB
+    EXPECT_EQ(output->atVoxel(P(-15, -15, 5)), VoxelOccupancy::Unmapped);
+}
+
+// Resolution status: factor 1 -> Accepted, >1 -> Ignored, 0<f<1 -> IgnoredTooSmall;
+// resolution is the default in every case.
+TEST(SimulationRun, FactoryResolutionStatusFromFactor) {
+    const PhysicalLength def = 10.0 * cm;
+    MissionConfigData m;
+
+    m.output_mapping_resolution_factor = 1.0;
+    const auto accepted = SimulationRunFactoryImpl::resolveOutputResolution(m, def);
+    EXPECT_EQ(accepted.status, ResolutionRequestStatus::Accepted);
+    EXPECT_DOUBLE_EQ(accepted.resolution.force_numerical_value_in(cm), 10.0);
+
+    m.output_mapping_resolution_factor = 2.0;
+    const auto ignored = SimulationRunFactoryImpl::resolveOutputResolution(m, def);
+    EXPECT_EQ(ignored.status, ResolutionRequestStatus::Ignored);
+    EXPECT_DOUBLE_EQ(ignored.resolution.force_numerical_value_in(cm), 10.0); // still default
+
+    m.output_mapping_resolution_factor = 0.5;
+    const auto too_small = SimulationRunFactoryImpl::resolveOutputResolution(m, def);
+    EXPECT_EQ(too_small.status, ResolutionRequestStatus::IgnoredTooSmall);
+    EXPECT_DOUBLE_EQ(too_small.resolution.force_numerical_value_in(cm), 10.0); // still default
+}
+
+// Full graph: create() wires the whole object without throwing (additional smoke test).
+TEST(SimulationRun, FactoryCreateWiresFullGraph) {
+    const std::filesystem::path path = writeHiddenNpy("dm_factory_create.npy");
+    SimulationConfigData sim;
+    sim.map_filename = path;
+    sim.map_resolution = 10.0 * cm;
+    sim.map_offset = P(0, 0, 0);
+    sim.initial_drone_position = P(25, 25, 25);
+    sim.initial_angle = 0.0 * horizontal_angle[deg];
+
+    MissionConfigData mission;
+    mission.max_steps = 10;
+    mission.gps_resolution = 8.0 * cm;
+    mission.output_mapping_resolution_factor = 1.0;
+    mission.mission_bounds = boundsBox(0, 50, 0, 50, 0, 50);
+
+    DroneConfigData drone;
+    drone.radius = 5.0 * cm;
+    drone.max_rotate = 45.0 * horizontal_angle[deg];
+    drone.max_advance = 10.0 * cm;
+    drone.max_elevate = 10.0 * cm;
+
+    LidarConfigData lidar;
+    lidar.z_min = 10.0 * cm;
+    lidar.z_max = 100.0 * cm;
+    lidar.d = 10.0 * cm;
+    lidar.fov_circles = 1;
+
+    SimulationRunFactoryImpl factory;
+    auto run = factory.create(sim, mission, drone, lidar, std::filesystem::temp_directory_path());
+    EXPECT_NE(run, nullptr);
+    std::filesystem::remove(path);
 }

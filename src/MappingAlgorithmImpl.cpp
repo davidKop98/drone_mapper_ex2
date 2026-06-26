@@ -116,12 +116,12 @@ double MappingAlgorithmImpl::stepAngleDeg() const {
 MappingAlgorithmImpl::CellKey MappingAlgorithmImpl::cellOf(const Position3D& pos) const {
     const types::MapConfig cfg = output_map_.getMapConfig();
     const double res = cfg.resolution.force_numerical_value_in(cm);
-    if (res <= 0.0) return {0, 0, 0};
+    if (res <= 0.0) return {0, 0, 0}; //res shouldnt be 0 but just in case
     const double ox = cfg.offset.x.force_numerical_value_in(cm);
     const double oy = cfg.offset.y.force_numerical_value_in(cm);
     const double oz = cfg.offset.z.force_numerical_value_in(cm);
     return {
-        static_cast<long long>(std::floor((Xc(pos) - ox) / res + 1e-9)),
+        static_cast<long long>(std::floor((Xc(pos) - ox) / res + 1e-9)), //epsilon for FP error
         static_cast<long long>(std::floor((Yc(pos) - oy) / res + 1e-9)),
         static_cast<long long>(std::floor((Zc(pos) - oz) / res + 1e-9)),
     };

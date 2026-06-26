@@ -17,6 +17,7 @@ add_library(drone_mapper
     src/MockLidar.cpp
     src/MockMovement.cpp
     src/ScanResultToVoxels.cpp
+    src/CompositionParser.cpp
     src/SimulationManager.cpp
     src/SimulationRunFactoryImpl.cpp
     src/SimulationRunImpl.cpp
@@ -39,7 +40,7 @@ target_link_libraries(drone_mapper
     PUBLIC
         mp-units::mp-units
         TinyNPY::TinyNPY
-        #yaml-cpp::yaml-cpp you #you should add this when you actually use yaml parsing
+        yaml-cpp::yaml-cpp
 )
 
 add_executable(drone_mapper_simulation src/drone_mapper_simulation_main.cpp)
@@ -66,6 +67,10 @@ add_executable(drone_mapper_simulation_test
     tests/components/MappingAlgorithmTest.cpp
     tests/components/DroneControlTest.cpp
     tests/components/MissionControlTest.cpp
+    tests/components/MapsComparisonTest.cpp
+    tests/components/SimulationManagerTest.cpp
+    tests/integration/SimulationEndToEndTest.cpp
+    tests/integration/MockAlgorithmIntegrationTest.cpp
 )
 target_link_libraries(drone_mapper_simulation_test
     PRIVATE
