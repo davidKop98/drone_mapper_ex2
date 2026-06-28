@@ -125,7 +125,8 @@ TEST(Integration, RealStackScoresAndScannedWallLandsOccupied) {
     const SimulationResult& result = report.runs.at(0);
     EXPECT_GT(result.mission_score, 0.0);
     EXPECT_LE(result.mission_score, 100.0);
-    EXPECT_EQ(result.resolution_request_status, ResolutionRequestStatus::Accepted);
+    // gps 2cm / factor 1 = 2cm requested, finer than the 10cm we use -> IgnoredTooSmall.
+    EXPECT_EQ(result.resolution_request_status, ResolutionRequestStatus::IgnoredTooSmall);
     ASSERT_FALSE(result.mission_results.empty());
     std::cerr << "[int] real score=" << result.mission_score
               << " steps=" << result.mission_results.at(0).steps << '\n';

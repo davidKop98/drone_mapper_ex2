@@ -21,11 +21,13 @@ Position3D makePos(double x, double y, double z) {
 
 // Cell-by-cell accuracy in [0, 100], one score per target. Ported from EX1's
 // Simulator::computeScore, adapted for EX2's voxel states:
-//   * Iterate the origin's in-bounds cells (its MappingBounds box at its resolution),
-//     sampling each cell center, and score only cells that are ALSO in-bounds in the
-//     target (the intersection).
-//   * Binary "Occupied vs not": a cell is correct when origin and target AGREE on
-//     whether it is Occupied. Unmapped and PotentiallyOccupied count as "not Occupied",
+//   * Sweep the origin's MappingBounds box in fine sub-voxel steps (resolution / 4),
+//     like the collision sweep, and score only points that are ALSO in-bounds in the
+//     target (the intersection). atVoxel snaps each sample to its voxel, so on aligned
+//     same-resolution grids the score equals the per-voxel ratio; the finer sampling
+//     adds precision when the origin and target grids are offset/misaligned.
+//   * Binary "Occupied vs not": a sampled point is correct when origin and target AGREE
+//     on whether it is Occupied. Unmapped and PotentiallyOccupied count as "not Occupied",
 //     so an unmapped wall (origin Occupied, target not) costs score.
 //   * Divergence from EX1: EX1 required an exact Empty<->Empty / Occupied<->Occupied
 //     match, so a target-Unmapped cell over an Empty origin cell was WRONG there. Under
@@ -48,35 +50,43 @@ std::vector<double> MapsComparison::compare(const IMap3D& origin,
     const double min_x = bounds.min_x.force_numerical_value_in(cm);
     const double min_y = bounds.min_y.force_numerical_value_in(cm);
     const double min_z = bounds.min_height.force_numerical_value_in(cm);
-    const int nx = std::max(0, static_cast<int>(std::lround((bounds.max_x.force_numerical_value_in(cm) - min_x) / res)));
-    const int ny = std::max(0, static_cast<int>(std::lround((bounds.max_y.force_numerical_value_in(cm) - min_y) / res)));
-    const int nz = std::max(0, static_cast<int>(std::lround((bounds.max_height.force_numerical_value_in(cm) - min_z) / res)));
+    const double max_x = bounds.max_x.force_numerical_value_in(cm);
+    const double max_y = bounds.max_y.force_numerical_value_in(cm);
+    const double max_z = bounds.max_height.force_numerical_value_in(cm);
+
+    // Fine sub-voxel sweep: step a quarter of a cell, sampling sub-cell centers so no
+    // sample lands exactly on a voxel boundary. Counts are integers so every voxel of an
+    // aligned grid gets exactly the same number of samples.
+    const double step = res / 4.0;
+    const long nx = std::max(0L, std::lround((max_x - min_x) / step));
+    const long ny = std::max(0L, std::lround((max_y - min_y) / step));
+    const long nz = std::max(0L, std::lround((max_z - min_z) / step));
 
     for (IMap3D* target : targets) {
         if (target == nullptr) {
-            scores.push_back(0.0);
+            scores.push_back(-1.0);
             continue;
         }
         long long total = 0;
         long long correct = 0;
-        for (int iz = 0; iz < nz; ++iz) {
-            const double z = min_z + (static_cast<double>(iz) + 0.5) * res;
-            for (int iy = 0; iy < ny; ++iy) {
-                const double y = min_y + (static_cast<double>(iy) + 0.5) * res;
-                for (int ix = 0; ix < nx; ++ix) {
-                    const double x = min_x + (static_cast<double>(ix) + 0.5) * res;
-                    const Position3D center = makePos(x, y, z);
-                    if (!origin.isInBounds(center) || !target->isInBounds(center)) {
-                        continue; // only score cells in-bounds in BOTH maps
+        for (long iz = 0; iz < nz; ++iz) {
+            const double z = min_z + (static_cast<double>(iz) + 0.5) * step;
+            for (long iy = 0; iy < ny; ++iy) {
+                const double y = min_y + (static_cast<double>(iy) + 0.5) * step;
+                for (long ix = 0; ix < nx; ++ix) {
+                    const double x = min_x + (static_cast<double>(ix) + 0.5) * step;
+                    const Position3D sample = makePos(x, y, z);
+                    if (!origin.isInBounds(sample) || !target->isInBounds(sample)) {
+                        continue; // only score points in-bounds in BOTH maps
                     }
                     ++total;
-                    if (isOccupied(origin, center) == isOccupied(*target, center)) {
+                    if (isOccupied(origin, sample) == isOccupied(*target, sample)) {
                         ++correct;
                     }
                 }
             }
         }
-        // No overlapping in-bounds cells (e.g. disjoint boxes or an empty grid) is
+        // No overlapping in-bounds region (e.g. disjoint boxes or an empty grid) is
         // undefined rather than 0%; report a negative sentinel so callers can detect it.
         scores.push_back(total > 0 ? static_cast<double>(correct) / static_cast<double>(total) * 100.0 : -1.0);
     }

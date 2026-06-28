@@ -325,26 +325,33 @@ TEST(SimulationRun, FactoryOutputMapOffsetIsBoundsMin) {
     EXPECT_EQ(output->atVoxel(P(-15, -15, 5)), VoxelOccupancy::Unmapped);
 }
 
-// Resolution status: factor 1 -> Accepted, >1 -> Ignored, 0<f<1 -> IgnoredTooSmall;
-// resolution is the default in every case.
-TEST(SimulationRun, FactoryResolutionStatusFromFactor) {
-    const PhysicalLength def = 10.0 * cm;
+// Resolution status compares the requested resolution (gps_resolution / factor) against the
+// resolution we actually use (the default = 10cm). The resolution returned is the default
+// in every case; only the status changes.
+TEST(SimulationRun, FactoryResolutionStatusFromExpectedResolution) {
+    const PhysicalLength def = 10.0 * cm; // the resolution we actually use
     MissionConfigData m;
 
-    m.output_mapping_resolution_factor = 1.0;
+    // expected = 20 / 2 = 10 == used -> Accepted (even though factor != 1).
+    m.gps_resolution = 20.0 * cm;
+    m.output_mapping_resolution_factor = 2.0;
     const auto accepted = SimulationRunFactoryImpl::resolveOutputResolution(m, def);
     EXPECT_EQ(accepted.status, ResolutionRequestStatus::Accepted);
     EXPECT_DOUBLE_EQ(accepted.resolution.force_numerical_value_in(cm), 10.0);
 
+    // expected = 5 / 1 = 5 < used -> IgnoredTooSmall (even though factor == 1).
+    m.gps_resolution = 5.0 * cm;
+    m.output_mapping_resolution_factor = 1.0;
+    const auto too_small = SimulationRunFactoryImpl::resolveOutputResolution(m, def);
+    EXPECT_EQ(too_small.status, ResolutionRequestStatus::IgnoredTooSmall);
+    EXPECT_DOUBLE_EQ(too_small.resolution.force_numerical_value_in(cm), 10.0); // still default
+
+    // expected = 40 / 2 = 20 > used -> Ignored (coarser than we use).
+    m.gps_resolution = 40.0 * cm;
     m.output_mapping_resolution_factor = 2.0;
     const auto ignored = SimulationRunFactoryImpl::resolveOutputResolution(m, def);
     EXPECT_EQ(ignored.status, ResolutionRequestStatus::Ignored);
     EXPECT_DOUBLE_EQ(ignored.resolution.force_numerical_value_in(cm), 10.0); // still default
-
-    m.output_mapping_resolution_factor = 0.5;
-    const auto too_small = SimulationRunFactoryImpl::resolveOutputResolution(m, def);
-    EXPECT_EQ(too_small.status, ResolutionRequestStatus::IgnoredTooSmall);
-    EXPECT_DOUBLE_EQ(too_small.resolution.force_numerical_value_in(cm), 10.0); // still default
 }
 
 // Full graph: create() wires the whole object without throwing (additional smoke test).

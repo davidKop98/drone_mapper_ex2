@@ -55,7 +55,7 @@ std::unique_ptr<Map3DImpl> SimulationRunFactoryImpl::makeOutputMap(const types::
     const double max_x = bounds.max_x.force_numerical_value_in(cm);
     const double max_y = bounds.max_y.force_numerical_value_in(cm);
     const double max_z = bounds.max_height.force_numerical_value_in(cm);
-
+    //lambda func which computes how many grid cells fit between lo and hi                                                             
     const auto cellCount = [res](double lo, double hi) -> std::size_t {
         if (res <= 0.0) return 0;
         return static_cast<std::size_t>(std::max(0L, std::lround((hi - lo) / res)));
@@ -76,23 +76,35 @@ std::unique_ptr<Map3DImpl> SimulationRunFactoryImpl::makeOutputMap(const types::
     return std::make_unique<Map3DImpl>(arr, cfg);
 }
 
-SimulationRunFactoryImpl::ResolutionDecision
-SimulationRunFactoryImpl::resolveOutputResolution(const types::MissionConfigData& mission,
+SimulationRunFactoryImpl::ResolutionDecision SimulationRunFactoryImpl::resolveOutputResolution(const types::MissionConfigData& mission,
                                                   PhysicalLength default_resolution) {
+    // The requested ("expected") output resolution is gps_resolution / factor. We always
+    // operate at default_resolution (the input-map resolution); the status only reports how
+    // the request compares to what we actually use:
+    //   expected == used        -> Accepted        (our default happens to honor the request)
+    //   expected <  used (finer) -> IgnoredTooSmall (we won't map finer than supported)
+    //   otherwise                -> Ignored         (coarser, or an invalid request)
+    const double used = default_resolution.force_numerical_value_in(cm);
+    const double gps = mission.gps_resolution.force_numerical_value_in(cm);
     const double factor = mission.output_mapping_resolution_factor;
+
     types::ResolutionRequestStatus status;
-    if (std::abs(factor - 1.0) < 1e-9) {
-        status = types::ResolutionRequestStatus::Accepted; // matches our single supported resolution
-    } else if (factor > 0.0 && factor < 1.0) {
-        status = types::ResolutionRequestStatus::IgnoredTooSmall; // finer than supported
+    if (factor <= 0.0 || gps <= 0.0) {
+        status = types::ResolutionRequestStatus::Ignored; // undefined request -> use default
     } else {
-        status = types::ResolutionRequestStatus::Ignored; // coarser, or an invalid factor
+        const double expected = gps / factor;
+        if (std::abs(expected - used) < 1e-9) {
+            status = types::ResolutionRequestStatus::Accepted;
+        } else if (expected < used) {
+            status = types::ResolutionRequestStatus::IgnoredTooSmall;
+        } else {
+            status = types::ResolutionRequestStatus::Ignored;
+        }
     }
-    return ResolutionDecision{default_resolution, status}; // always the default resolution
+    return ResolutionDecision{default_resolution, status}; // always the default (input-map) resolution
 }
 
-std::unique_ptr<ISimulationRun>
-SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
+std::unique_ptr<ISimulationRun> SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
                                  const types::MissionConfigData& mission,
                                  const types::DroneConfigData& drone,
                                  const types::LidarConfigData& lidar,
@@ -104,8 +116,7 @@ SimulationRunFactoryImpl::create(const types::SimulationConfigData& simulation,
 
     // One shared exact truth with two views: exact feeds lidar/movement, rounded is what
     // the drone/algorithm observe.
-    auto exact_gps = std::make_unique<MockGPS>(
-        simulation.initial_drone_position,
+    auto exact_gps = std::make_unique<MockGPS>(simulation.initial_drone_position,
         Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]}, 0.0 * cm);
     auto rounded_gps = std::make_unique<MockGPS>(exact_gps->truth(), mission.gps_resolution);
 
