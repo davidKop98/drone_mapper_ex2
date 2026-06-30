@@ -71,7 +71,11 @@ add_executable(drone_mapper_simulation_test
     tests/components/SimulationManagerTest.cpp
     tests/integration/SimulationEndToEndTest.cpp
     tests/integration/MockAlgorithmIntegrationTest.cpp
+    tests/integration/BenchmarkMapIntegrationTest.cpp
 )
+target_compile_definitions(drone_mapper_simulation_test
+    PRIVATE
+        BENCHMARK_MAP_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data_maps/benchmark_map.npy")
 target_link_libraries(drone_mapper_simulation_test
     PRIVATE
         drone_mapper

@@ -104,12 +104,14 @@ double MappingAlgorithmImpl::clearanceCm() const {
 }
 
 double MappingAlgorithmImpl::stepAngleDeg() const {
-    constexpr double kMaxStep = 10.0; //might need to change these 2 values for efficiency
-    constexpr double kMinStep = 2.0;
+    // 2x-wider scan angles (was [2,10] deg, *1) -> ~1/4 the beams per sphere scan, to cut
+    // wall-clock. Coarser angular sampling may miss thin features; watch the score.
+    constexpr double kMaxStep = 20.0;
+    constexpr double kMinStep = 4.0;
     const double spacing = lidar_config_.d.force_numerical_value_in(cm);
     const double beam_min = lidar_config_.z_min.force_numerical_value_in(cm);
     if (spacing <= 0.0 || beam_min <= 0.0) return kMaxStep;
-    const double step = toDeg(std::atan(spacing / beam_min));
+    const double step = toDeg(std::atan(spacing / beam_min)) * 2.0;
     return std::clamp(step, kMinStep, kMaxStep);
 }
 
