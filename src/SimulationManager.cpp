@@ -1,6 +1,7 @@
 #include <drone_mapper/SimulationManager.h>
 
 #include <drone_mapper/ISimulationRun.h>
+#include <drone_mapper/Units.h>
 
 #include <yaml-cpp/yaml.h>
 
@@ -9,6 +10,7 @@
 #include <exception>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -119,12 +121,27 @@ void writeReportYaml(const fs::path& path, const types::SimulationManagerReport&
 // the batch continues.
 types::SimulationResult runOne(ISimulationRunFactory& factory,
                                const types::SimulationConfigData& sim,
-                               const types::MissionConfigData& mission,
+                               const types::MissionConfigData& mission_in,
                                const types::DroneConfigData& drone,
                                const types::LidarConfigData& lidar,
                                const fs::path& run_output_path,
                                std::ofstream& error_log,
                                std::size_t run_index) {
+    // Config guard: the planner reasons in rounded-GPS coordinates but acts in exact ones, which
+    // is only self-consistent while gps_resolution <= map_resolution. If gps is coarser, clamp it
+    // down to the map resolution and log immediately, then run with the recovered value.
+    types::MissionConfigData mission = mission_in;
+    const double gps_cm = mission.gps_resolution.force_numerical_value_in(cm);
+    const double map_cm = sim.map_resolution.force_numerical_value_in(cm);
+    if (gps_cm > map_cm) {
+        std::ostringstream msg;
+        msg << "gps_resolution (" << gps_cm << "cm) > map_resolution (" << map_cm
+            << "cm); the planner assumes gps_resolution <= map_resolution -- clamping "
+               "gps_resolution to " << map_cm << "cm for this run.";
+        logError(error_log, run_index, types::ErrorRef{"GPS_RES_EXCEEDS_MAP_RES", msg.str()});
+        mission.gps_resolution = sim.map_resolution;
+    }
+
     try {
         std::unique_ptr<ISimulationRun> run = factory.create(sim, mission, drone, lidar, run_output_path);
         types::SimulationResult result = run->run(); // run() catches its own errors -> -1 result

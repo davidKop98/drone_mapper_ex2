@@ -114,9 +114,18 @@ std::unique_ptr<ISimulationRun> SimulationRunFactoryImpl::create(const types::Si
     const ResolutionDecision resolution = resolveOutputResolution(mission, simulation.map_resolution);
     auto output_map = makeOutputMap(mission.mission_bounds, resolution.resolution);
 
+    // The initial drone position is given RELATIVE to the map offset, so the real-world start
+    // adds the offset per axis (e.g. initial (10,0,0) with offset (10,10,10) -> real (20,10,10)).
+    // Mission boundaries, by contrast, stay in absolute real-world coordinates.
+    const Position3D real_start{
+        simulation.initial_drone_position.x + simulation.map_offset.x,
+        simulation.initial_drone_position.y + simulation.map_offset.y,
+        simulation.initial_drone_position.z + simulation.map_offset.z,
+    };
+
     // One shared exact truth with two views: exact feeds lidar/movement, rounded is what
     // the drone/algorithm observe.
-    auto exact_gps = std::make_unique<MockGPS>(simulation.initial_drone_position,
+    auto exact_gps = std::make_unique<MockGPS>(real_start,
         Orientation{simulation.initial_angle, 0.0 * altitude_angle[deg]}, 0.0 * cm);
     auto rounded_gps = std::make_unique<MockGPS>(exact_gps->truth(), mission.gps_resolution);
 

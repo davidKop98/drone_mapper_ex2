@@ -12,31 +12,41 @@ namespace drone_mapper {
 // in the cwd; a relative path stays relative to the cwd; an absolute path is used as-is.
 [[nodiscard]] std::filesystem::path resolveCompositionPath(const std::optional<std::string>& arg);
 
-// Parse a composition YAML into the grouped SimulationCompositionData. Missing keys fall
-// back to sane defaults; throws std::runtime_error only when the file cannot be loaded.
+// Parse a composition YAML into the grouped SimulationCompositionData. Missing keys fall back
+// to sane defaults; throws std::runtime_error when the composition file, or any file it
+// references, cannot be loaded. All references (and each simulation's map_filename) are
+// resolved relative to the composition file's own directory.
 //
-// Expected schema:
-//   simulations:
-//     - map_filename: <path>
+// Expected schema (hierarchical, multi-file):
+//   sim_compose.yaml:
+//     simulation_compositions:
+//       simulations:
+//         - simulation_config: "simulation/<name>.yaml"
+//           mission_configs: ["mission/<name>.yaml", ...]
+//       drone_configs: ["drone/<name>.yaml", ...]
+//       lidar_configs: ["lidar/<name>.yaml", ...]
+//
+//   simulation/<name>.yaml:
+//     simulation_config:
+//       map_filename: <path relative to the composition dir>
 //       map_resolution_cm: <num>
-//       map_offset_cm: [x, y, z]
-//       initial_drone_position_cm: [x, y, z]
+//       initial_drone_position: {x_cm, y_cm, height_cm}
 //       initial_angle_deg: <num>
-//       missions:
-//         - max_steps: <int>
-//           gps_resolution_cm: <num>
-//           output_mapping_resolution_factor: <num>
-//           boundaries_cm: [min_x, min_y, min_z, max_x, max_y, max_z]
-//   drones:
-//     - dimensions_cm: <num>     # diameter; radius = dimensions_cm / 2
-//       max_rotate_deg: <num>
-//       max_advance_cm: <num>
-//       max_elevate_cm: <num>
-//   lidars:
-//     - z_min_cm: <num>
-//       z_max_cm: <num>
-//       circle_spacing_cm: <num> # the lidar's d
-//       fov_circles: <int>
+//       map_axes_offset: {x_offset, y_offset, height_offset}
+//
+//   mission/<name>.yaml:
+//     mission_config:
+//       max_steps: <int>
+//       gps_resolution_cm: <num>
+//       output_mapping_resolution_factor: <num>   # optional, default 1.0
+//       boundaries: {x_boundary|y_boundary|height_boundary: {min_cm, max_cm}}
+//
+//   drone/<name>.yaml:
+//     drone_config: {dimensions_cm, max_rotate_deg, max_advance_cm, max_elevate_cm}
+//                    # dimensions_cm is the sphere DIAMETER; radius = dimensions_cm / 2
+//
+//   lidar/<name>.yaml:
+//     lidar_config: {z_min_cm, z_max_cm, d_cm, fov_circles}
 [[nodiscard]] types::SimulationCompositionData parseCompositionYaml(const std::filesystem::path& path);
 
 } // namespace drone_mapper

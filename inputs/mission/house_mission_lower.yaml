@@ -1,0 +1,14 @@
+mission_config:
+  max_steps: 2000
+  boundaries:
+    x_boundary:
+      min_cm:  0
+      max_cm:  290
+    y_boundary:
+      min_cm: 0
+      max_cm: 300
+    height_boundary:           # lower floor only: floor-1 interior world z[300,350]
+      min_cm: 300
+      max_cm: 350
+  gps_resolution_cm: 5         # GPS expected measurement precision
+

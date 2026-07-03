@@ -117,7 +117,7 @@ double MappingAlgorithmImpl::stepAngleDeg() const {
 
 MappingAlgorithmImpl::CellKey MappingAlgorithmImpl::cellOf(const Position3D& pos) const {
     const types::MapConfig cfg = output_map_.getMapConfig();
-    const double res = cfg.resolution.force_numerical_value_in(cm);
+    const double res = cfg.resolution.force_numerical_value_in(cm); //OUTPut map res
     if (res <= 0.0) return {0, 0, 0}; //res shouldnt be 0 but just in case
     const double ox = cfg.offset.x.force_numerical_value_in(cm);
     const double oy = cfg.offset.y.force_numerical_value_in(cm);
@@ -164,7 +164,7 @@ bool MappingAlgorithmImpl::pathSafe(const Position3D& start, const Position3D& t
     const double dz = Zc(target) - Zc(start);
     const double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
     const double sub = 0.5 * moveStepCm();
-    const int n = std::max(1, static_cast<int>(std::ceil(dist / std::max(sub, 1e-9))));
+    const int n = std::max(1, static_cast<int>(std::ceil(dist / std::max(sub, 1e-9)))); //number of steps
     for (int i = 0; i <= n; ++i) {
         const double f = static_cast<double>(i) / n;
         const Position3D p = makePos(Xc(start) + f * dx, Yc(start) + f * dy, Zc(start) + f * dz);
@@ -196,7 +196,7 @@ bool MappingAlgorithmImpl::anyInBoundsUnmapped() const {
     }
     return false;
 }
-
+//rounded position based on gps_resolution
 bool MappingAlgorithmImpl::findNextTarget(const Position3D& pos) {
     const double step = moveStepCm();
     const double px = Xc(pos);
@@ -318,7 +318,7 @@ types::MappingStepCommand MappingAlgorithmImpl::finishedStep() const {
                                               : types::AlgorithmStatus::Finished;
     return types::MappingStepCommand{std::nullopt, std::nullopt, status};
 }
-
+//position here is rounded based on gps_resolution
 types::MappingStepCommand MappingAlgorithmImpl::step(const Position3D& pos, double heading_deg) {
     switch (phase_) {
     case Phase::Scanning: {
@@ -376,9 +376,9 @@ types::MappingStepCommand MappingAlgorithmImpl::step(const Position3D& pos, doub
         const double dy = Yc(next_target_) - Yc(pos);
         const double dz = Zc(next_target_) - Zc(pos);
 
-        if (std::abs(dz) > kEpsCm) {
+        if (std::abs(dz) > kEpsCm) { //Z delta > 0 means we elevate
             pending_elevate_cm_ = dz;
-            pushChunkedElevate(-dz); // inverse: opposite sign
+            pushChunkedElevate(-dz); // inverse:push opposite sign
             return step(pos, heading_deg);
         }
 

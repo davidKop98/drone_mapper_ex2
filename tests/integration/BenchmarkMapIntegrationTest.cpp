@@ -18,8 +18,11 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
+#include <string>
 #include <system_error>
 
 namespace {
@@ -96,6 +99,84 @@ SimulationManagerReport runBenchmark(const fs::path& out, double res_cm, double 
                                      std::size_t max_steps, double factor = 1.0) {
     return runBenchmarkBounded(out, res_cm, radius_cm, gps_cm, start, heading_deg, max_steps,
                                fullBounds(res_cm, 29, 30, 31), factor);
+}
+
+// Translate a bounds box by a map offset (cm), so a cellBox built in the offset-0 frame lands
+// correctly when the hidden map itself is shifted (negative-offset tests).
+MappingBounds offsetBounds(MappingBounds b, double ox, double oy, double oz) {
+    return MappingBounds{b.min_x + ox * x_extent[cm], b.max_x + ox * x_extent[cm],
+                         b.min_y + oy * y_extent[cm], b.max_y + oy * y_extent[cm],
+                         b.min_height + oz * z_extent[cm], b.max_height + oz * z_extent[cm]};
+}
+
+// Fully-parameterized run: every knob a "radical" test might twist (map offset, lidar geometry,
+// drone kinematics, gps). Defaults match the normal benchmark config.
+struct RunSpec {
+    std::string map_path = BENCHMARK_MAP_PATH;
+    double res_cm = 10.0;
+    double off_x = 0.0, off_y = 0.0, off_z = 0.0; // hidden-map offset (cm)
+    double radius_cm = 2.0;
+    double gps_cm = 2.0;
+    Position3D start{};
+    double heading_deg = 0.0;
+    std::size_t max_steps = 60000;
+    MappingBounds bounds{};
+    double lz_min = 10.0, lz_max = 100.0, ld = 10.0; // lidar geometry
+    std::size_t fov_circles = 1;
+    double max_rotate = 45.0, max_advance = 10.0, max_elevate = 10.0; // drone kinematics
+};
+
+SimulationManagerReport runSpec(const fs::path& out, const RunSpec& s) {
+    SimulationConfigData sim;
+    sim.map_filename = s.map_path;
+    sim.map_resolution = s.res_cm * cm;
+    sim.map_offset = P(s.off_x, s.off_y, s.off_z);
+    sim.initial_drone_position = s.start;
+    sim.initial_angle = s.heading_deg * horizontal_angle[deg];
+
+    MissionConfigData mission;
+    mission.max_steps = s.max_steps;
+    mission.gps_resolution = s.gps_cm * cm;
+    mission.output_mapping_resolution_factor = 1.0;
+    mission.mission_bounds = s.bounds;
+
+    DroneConfigData drone;
+    drone.radius = s.radius_cm * cm;
+    drone.max_rotate = s.max_rotate * horizontal_angle[deg];
+    drone.max_advance = s.max_advance * cm;
+    drone.max_elevate = s.max_elevate * cm;
+
+    LidarConfigData lidar;
+    lidar.z_min = s.lz_min * cm;
+    lidar.z_max = s.lz_max * cm;
+    lidar.d = s.ld * cm;
+    lidar.fov_circles = s.fov_circles;
+
+    SimulationCompositionData comp;
+    comp.simulation_mission_groups = {{sim, {mission}}};
+    comp.drones = {drone};
+    comp.lidars = {lidar};
+
+    auto factory = std::make_unique<SimulationRunFactoryImpl>();
+    SimulationManager mgr(std::move(factory));
+    return mgr.run(comp, out);
+}
+
+// "Acted properly on a weird input" = no crash, a single run, a status from the valid enum, and
+// a score that's either the no-overlap sentinel (-1) or a real percentage in [0,100].
+void expectGraceful(const char* tag, const SimulationManagerReport& report) {
+    ASSERT_EQ(report.runs.size(), 1u) << tag;
+    const SimulationResult& r = report.runs.at(0);
+    ASSERT_FALSE(r.mission_results.empty()) << tag;
+    const MissionRunStatus st = r.mission_results.at(0).status;
+    EXPECT_TRUE(st == MissionRunStatus::Completed || st == MissionRunStatus::MaxSteps ||
+                st == MissionRunStatus::Error)
+        << tag;
+    EXPECT_GE(r.mission_score, -1.0) << tag;
+    EXPECT_LE(r.mission_score, 100.0) << tag;
+    std::cerr << "[radical] " << tag << " score=" << r.mission_score
+              << " steps=" << r.mission_results.at(0).steps
+              << " status=" << static_cast<int>(st) << '\n';
 }
 } // namespace
 
@@ -386,4 +467,180 @@ TEST(Integration, BenchmarkMapFloor2InteriorStart) {
     runVariant("floor2 interior r2",
         {/*r*/ 2, /*gps*/ 2, P(145, 105, 235), /*h*/ 0, /*cap*/ 150000,
          cellBox(2, 26, 2, 25, 15, 27, 10.0), /*min*/ 75.0});
+}
+
+// ============================ Radical / robustness tests ============================
+// Each pokes the stack with an abnormal input and asserts it degrades gracefully (no crash,
+// valid status, valid-or-sentinel score) rather than corrupting state or throwing out.
+
+// WEIRD BOUNDS: inverted box (max < min). makeOutputMap clamps to a 0-cell map; nothing is
+// in-bounds, so the drone finishes immediately and scoring finds no overlap (-1 sentinel).
+TEST(Radical, InvertedMissionBounds) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_inv";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.start = P(145, 105, 175); s.max_steps = 20000;
+    s.bounds = MappingBounds{260.0 * x_extent[cm], 20.0 * x_extent[cm],   // max_x < min_x
+                             250.0 * y_extent[cm], 20.0 * y_extent[cm],
+                             270.0 * z_extent[cm], 150.0 * z_extent[cm]};
+    expectGraceful("inverted-bounds", runSpec(out, s));
+    fs::remove_all(out, ec);
+}
+
+// WEIRD BOUNDS: a box entirely off the map (far in +x/+y). No overlap with the hidden map, so
+// the score is the no-overlap sentinel; the run must still complete cleanly.
+TEST(Radical, BoundsDisjointFromMap) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_disjoint";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.start = P(555, 555, 105); s.max_steps = 15000;
+    s.bounds = cellBox(50, 60, 50, 60, 5, 15, 10.0); // world [500,600]x[500,600]x[50,150]
+    const auto report = runSpec(out, s);
+    expectGraceful("bounds-disjoint", report);
+    EXPECT_LT(report.runs.at(0).mission_score, 0.0) << "disjoint -> -1 sentinel";
+    fs::remove_all(out, ec);
+}
+
+// WEIRD BOUNDS: a box much larger than the map, with NEGATIVE mins. Output extends into space
+// the hidden map doesn't cover (OutOfBounds there); only the overlap is scored -> still > 0.
+TEST(Radical, OversizedNegativeBounds) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_oversize";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.start = P(145, 105, 175); s.max_steps = 50000;
+    s.bounds = cellBox(-5, 34, -5, 34, -5, 34, 10.0); // world [-50,340]^3, encloses the map
+    const auto report = runSpec(out, s);
+    expectGraceful("oversized-negative-bounds", report);
+    EXPECT_GT(report.runs.at(0).mission_score, 0.0);
+    fs::remove_all(out, ec);
+}
+
+// WEIRD BOUNDS: a single-voxel-thick slab (one z layer). The drone is confined to that layer.
+TEST(Radical, ThinSingleLayerBounds) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_thin";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.start = P(145, 105, 175); s.max_steps = 60000;
+    s.bounds = cellBox(2, 26, 2, 25, 17, 18, 10.0); // z = [170,180), one cell thick
+    const auto report = runSpec(out, s);
+    expectGraceful("thin-single-layer", report);
+    EXPECT_GT(report.runs.at(0).mission_score, 0.0);
+    fs::remove_all(out, ec);
+}
+
+// LIDAR: a very short beam (z_max = 15cm, ~1.5 cells). The drone can barely see; it should
+// still run and map a little rather than break.
+TEST(Radical, ShortLidarBeam) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_short";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.start = P(145, 105, 175); s.max_steps = 60000;
+    s.bounds = cellBox(2, 26, 2, 25, 15, 27, 10.0);
+    s.lz_max = 15.0; // very short reach
+    expectGraceful("short-lidar-beam", runSpec(out, s));
+    fs::remove_all(out, ec);
+}
+
+// LIDAR: fov_circles = 0. MockLidar returns no hits, so nothing is mapped; the algorithm must
+// still terminate cleanly (no confirmed-Empty neighbors -> finishes) instead of hanging/UB.
+TEST(Radical, ZeroFovCircles) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_fov0";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.start = P(145, 105, 175); s.max_steps = 60000;
+    s.bounds = cellBox(2, 26, 2, 25, 15, 27, 10.0);
+    s.fov_circles = 0;
+    expectGraceful("fov-circles-0", runSpec(out, s));
+    fs::remove_all(out, ec);
+}
+
+// LIDAR: a dense, wide FOV (5 circles -> 1+4+16+64+256 = 341 beams PER scan call). Beam count
+// grows 4^circle, so this is ~340x the per-step lidar cost of fov=1; the step cap is kept small
+// so the suite stays fast. Mainly checks the wide-FOV beam math stays in range and maps.
+TEST(Radical, DenseFovCircles) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_fov5";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.start = P(145, 105, 175); s.max_steps = 800; // small: each step does 341 raytraces
+    s.bounds = cellBox(2, 26, 2, 25, 15, 27, 10.0);
+    s.fov_circles = 5;
+    const auto report = runSpec(out, s);
+    expectGraceful("fov-circles-5", report);
+    EXPECT_GT(report.runs.at(0).mission_score, 0.0);
+    fs::remove_all(out, ec);
+}
+
+// GPS vs SIZE: a tiny drone (r=2) with a LARGE gps uncertainty (30cm). Clearance = r + gps/2 =
+// 17cm, so the cautious footprint dominates the small body. Must stay graceful (likely a low
+// score from heavy self-restriction), not wedge or crash.
+TEST(Radical, SmallDroneLargeGps) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_smallbiggps";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.radius_cm = 2.0; s.gps_cm = 30.0; s.start = P(145, 105, 175); s.max_steps = 60000;
+    s.bounds = cellBox(2, 26, 2, 25, 15, 27, 10.0);
+    expectGraceful("small-drone-large-gps", runSpec(out, s));
+    fs::remove_all(out, ec);
+}
+
+// GPS vs SIZE: the opposite extreme -- a big drone (r=20) with near-perfect gps (0.5cm). The
+// body dominates clearance; it explores the open yard over the full map.
+TEST(Radical, LargeDroneTinyGps) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_biglowgps";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.radius_cm = 20.0; s.gps_cm = 0.5; s.start = P(225, 275, 185); s.heading_deg = 270;
+    s.max_steps = 40000; s.bounds = fullBounds(10.0, 29, 30, 31);
+    const auto report = runSpec(out, s);
+    expectGraceful("large-drone-tiny-gps", report);
+    EXPECT_GT(report.runs.at(0).mission_score, 0.0);
+    fs::remove_all(out, ec);
+}
+
+// GPS: exactly zero gps_resolution. The rounded GPS view collapses to the exact view (res<=0),
+// so the drone observes truth. Must behave like a very-fine-gps run, not divide-by-zero.
+TEST(Radical, ZeroGpsResolution) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_gps0";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s; s.gps_cm = 0.0; s.start = P(145, 105, 175); s.max_steps = 80000;
+    s.bounds = cellBox(2, 26, 2, 25, 15, 27, 10.0);
+    const auto report = runSpec(out, s);
+    expectGraceful("zero-gps", report);
+    EXPECT_GT(report.runs.at(0).mission_score, 0.0);
+    fs::remove_all(out, ec);
+}
+
+// NEGATIVE MAP OFFSET: place the hidden map at world origin (-150,-150,-150). The start is
+// RELATIVE to the offset (the factory adds it): (145,105,175) + offset = real (-5,-45,25) ->
+// hidden cell (14,10,17), an interior floor-1 cell. Bounds are absolute, shifted to the map's
+// world location. Correct coordinate handling should map the house as well as the offset-0 run.
+TEST(Radical, NegativeMapOffset) {
+    const fs::path out = fs::temp_directory_path() / "dm_rad_negoff";
+    std::error_code ec; fs::remove_all(out, ec);
+    RunSpec s;
+    s.off_x = -150; s.off_y = -150; s.off_z = -150;
+    s.start = P(145, 105, 175); // relative to the offset -> real (-5,-45,25) = hidden cell (14,10,17)
+    s.max_steps = 150000;
+    s.bounds = offsetBounds(cellBox(2, 26, 2, 25, 15, 27, 10.0), -150, -150, -150);
+    const auto report = runSpec(out, s);
+    expectGraceful("negative-map-offset", report);
+    EXPECT_GT(report.runs.at(0).mission_score, 70.0) << "negatives must map as well as offset 0";
+    fs::remove_all(out, ec);
+}
+
+// CONFIG GUARD: gps_resolution (30) > map_resolution (10) is out of spec. The manager must log
+// GPS_RES_EXCEEDS_MAP_RES to the error log and RECOVER by clamping gps to the map resolution --
+// so instead of freezing after one scan (the raw gps=30 behavior), the drone explores like
+// gps=10 and reaches a normal score.
+TEST(Radical, GpsExceedsMapResIsGuardedAndClamped) {
+    const fs::path out = fs::temp_directory_path() / "dm_gps_guard";
+    std::error_code ec; fs::remove_all(out, ec);
+
+    RunSpec s; s.gps_cm = 30.0; s.res_cm = 10.0; s.start = P(145, 105, 175); s.max_steps = 40000;
+    s.bounds = cellBox(2, 26, 2, 25, 15, 27, 10.0);
+    const auto r = runSpec(out, s).runs.at(0);
+
+    // Recovered: clamped run maps like gps=10 (~89 over 40k steps), not the frozen 80.8 @ 181.
+    ASSERT_FALSE(r.mission_results.empty());
+    EXPECT_NE(r.mission_results.at(0).status, MissionRunStatus::Error);
+    EXPECT_GT(r.mission_score, 85.0);
+    EXPECT_GT(r.mission_results.at(0).steps, 1000u); // it actually moved, didn't freeze
+
+    // Guarded: the descriptive error was written immediately to the error log.
+    std::ifstream log(out / "output_results" / "errors.txt");
+    std::stringstream buf; buf << log.rdbuf();
+    EXPECT_NE(buf.str().find("GPS_RES_EXCEEDS_MAP_RES"), std::string::npos) << buf.str();
+
+    fs::remove_all(out, ec);
 }
