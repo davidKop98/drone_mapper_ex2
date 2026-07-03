@@ -220,7 +220,10 @@ TEST(SimulationRun, RotateAlwaysSucceedsAndUpdatesHeading) {
 // Parity: a move the algorithm's (radius + gps/2) clearance approves must not
 // false-crash in MockMovement (radius). The hidden map's real walls sit outside the
 // margin the algorithm enforced.
-TEST(SimulationRun, MovementParityWithAlgorithmClearance) {
+// Cross-component seam test (real MappingAlgorithmImpl + real MockMovement), so it
+// belongs to the Integration suite: in any single component's suite a bug in the
+// *other* component would fail the "wrong" suite. Assertions unchanged.
+TEST(Integration, MovementParityWithAlgorithmClearance) {
     Map3DImpl output(makeArray(7, 7, 7, 255), mapCfg(10, 7, 7, 7));
     fillCorridor(output); // algorithm will approve a +x advance into the corridor
     MappingAlgorithmImpl algo(missionCfg(8), lidarCfg(), droneCfg(2, 45, 100, 100), output);

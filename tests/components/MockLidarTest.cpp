@@ -1,4 +1,7 @@
-#include <drone_mapper/Map3DImpl.h>
+// The hidden map is scaffolding here (MockLidar's subject is ray marching), so it is
+// a FakeMap3D: Map3DImpl mutations cannot fail this suite.
+#include "FakeMap3D.h"
+
 #include <drone_mapper/MockGPS.h>
 #include <drone_mapper/MockLidar.h>
 #include <drone_mapper/Units.h>
@@ -7,20 +10,17 @@
 
 #include <gtest/gtest.h>
 
-#include <algorithm>
-#include <cstdint>
 #include <limits>
 #include <memory>
 
 namespace {
 using namespace drone_mapper;
 using namespace drone_mapper::types;
+using drone_mapper::test_support::FakeMap3D;
 
-std::shared_ptr<NpyArray> makeArray(std::size_t nx, std::size_t ny, std::size_t nz, std::uint8_t fill) {
-    auto arr = std::make_shared<NpyArray>(NpyArray::shape_t{nx, ny, nz}, sizeof(std::uint8_t), 'u', false);
-    arr->Allocate();
-    std::fill(arr->Data<std::uint8_t>(), arr->Data<std::uint8_t>() + arr->NumValue(), fill);
-    return arr;
+// All-Empty fake hidden map of [nx][ny][nz] cells (the old arrays were 0-filled).
+FakeMap3D emptyHidden(std::size_t nx, std::size_t ny, std::size_t nz, const MapConfig& cfg) {
+    return FakeMap3D(cfg, nx, ny, nz, VoxelOccupancy::Empty);
 }
 MapConfig mapCfg(double res) {
     MapConfig c;
@@ -56,8 +56,7 @@ bool isMiss(const LidarHit& hit) {
 
 // (a) straight scan into a wall -> hit at the right distance.
 TEST(MockLidar, StraightScanHit) {
-    auto arr = makeArray(20, 5, 5, 0); // world x[0,200), res 10
-    Map3DImpl hidden(arr, mapCfg(10.0));
+    FakeMap3D hidden = emptyHidden(20, 5, 5, mapCfg(10.0)); // world x[0,200), res 10
     hidden.set(P(105, 25, 25), VoxelOccupancy::Occupied); // wall cell x=10 [100,110)
 
     MockGPS exact(truthAt(5, 25, 25, 0), 0.0 * cm);
@@ -71,8 +70,7 @@ TEST(MockLidar, StraightScanHit) {
 
 // (a) open space within z_max -> miss (max double).
 TEST(MockLidar, MissReturnsMaxDouble) {
-    auto arr = makeArray(20, 20, 20, 0);
-    Map3DImpl hidden(arr, mapCfg(10.0));
+    FakeMap3D hidden = emptyHidden(20, 20, 20, mapCfg(10.0));
     hidden.set(P(105, 25, 25), VoxelOccupancy::Occupied); // wall only along +x
 
     MockGPS exact(truthAt(5, 25, 25, 0), 0.0 * cm);
@@ -85,8 +83,7 @@ TEST(MockLidar, MissReturnsMaxDouble) {
 
 // (a) wall closer than z_min -> too-close (distance 0).
 TEST(MockLidar, TooCloseReturnsZero) {
-    auto arr = makeArray(20, 5, 5, 0);
-    Map3DImpl hidden(arr, mapCfg(10.0));
+    FakeMap3D hidden = emptyHidden(20, 5, 5, mapCfg(10.0));
     hidden.set(P(15, 25, 25), VoxelOccupancy::Occupied); // wall cell x=1 [10,20), 5cm away
 
     MockGPS exact(truthAt(5, 25, 25, 0), 0.0 * cm);
@@ -99,8 +96,7 @@ TEST(MockLidar, TooCloseReturnsZero) {
 
 // (a) hits carry RELATIVE angles (independent of heading).
 TEST(MockLidar, HitsCarryRelativeAngles) {
-    auto arr = makeArray(20, 20, 20, 0);
-    Map3DImpl hidden(arr, mapCfg(10.0));
+    FakeMap3D hidden = emptyHidden(20, 20, 20, mapCfg(10.0));
 
     MockGPS exact(truthAt(50, 50, 50, 30), 0.0 * cm); // nonzero heading 30deg
     LidarConfigData lc = lidarCfg(1.0, 50.0);
@@ -116,8 +112,7 @@ TEST(MockLidar, HitsCarryRelativeAngles) {
 
 // (b) the lidar traces from the EXACT origin, not a gps-rounded one.
 TEST(MockLidar, UsesExactPositionNotRounded) {
-    auto arr = makeArray(40, 5, 5, 0); // world x[0,400), res 10
-    Map3DImpl hidden(arr, mapCfg(10.0));
+    FakeMap3D hidden = emptyHidden(40, 5, 5, mapCfg(10.0)); // world x[0,400), res 10
     hidden.set(P(305, 25, 25), VoxelOccupancy::Occupied); // wall cell x=30 [300,310)
 
     auto truth = truthAt(252, 25, 25, 0); // x=252 rounds to 250 at res 5
