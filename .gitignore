@@ -36,3 +36,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Binary viewer exports (keep locally, not in the repo; only .npy maps ship)
+*.cw

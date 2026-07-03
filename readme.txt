@@ -1,5 +1,13 @@
-drone_mapper - output formats
-==============================
+drone_mapper (EX2)
+==================
+David Kopilevitch 207230731
+Amit Nisenbaum 209907773
+
+External libraries (all course-provided / mandated by the skeleton, via vcpkg):
+  - mp-units   : compile-time physical units (lengths, angles) used across all interfaces
+  - yaml-cpp   : parsing the composition/config YAML files and writing simulation_output.yaml
+  - TinyNPY    : reading/writing the NumPy .npy voxel map files (NpyArray)
+  - GTest/GMock: the test framework for the unit/integration suites
 
 The simulator is run as:
 
