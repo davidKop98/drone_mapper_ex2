@@ -15,6 +15,8 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <string>
@@ -230,4 +232,169 @@ TEST(SimulationManager, CliPathResolution) {
     EXPECT_FALSE(resolveCompositionPath(std::optional<std::string>("runs/foo.yaml")).is_absolute());
     EXPECT_EQ(resolveCompositionPath(std::optional<std::string>("/abs/foo.yaml")), fs::path("/abs/foo.yaml"));
     EXPECT_TRUE(resolveCompositionPath(std::optional<std::string>("/abs/foo.yaml")).is_absolute());
+}
+
+// ---- Survivor-killing additions (mutation campaign) --------------------------------
+
+// Exact per-run values, summary convention, and failure detail, all re-read from the
+// report AND the written yaml: runs {90 (5 steps), 80 (7 steps), create-throws -> -1}.
+// score_range EXCLUDES failed (-1) runs by convention -> exactly (80, 90). The failed
+// run still carries a mission result with the RUN_CREATE_FAILED error detail.
+TEST(SimulationManager, ReportCarriesExactValuesSummaryAndFailureDetail) {
+    SimulationCompositionData comp;
+    comp.simulation_mission_groups = {{simCfg("a.npy"), {missionCfg()}}};
+    comp.drones = {droneCfg(), droneCfg(), droneCfg()}; // 3 runs
+    comp.lidars = {lidarCfg()};
+
+    auto factory = std::make_unique<MockFactory>();
+    int call = 0;
+    EXPECT_CALL(*factory, create(_, _, _, _, _))
+        .Times(3)
+        .WillRepeatedly([&call](const SimulationConfigData&, const MissionConfigData&,
+                                const DroneConfigData&, const LidarConfigData&,
+                                const fs::path&) -> std::unique_ptr<ISimulationRun> {
+            const int i = call++;
+            if (i == 2) throw std::runtime_error("cannot load a.npy");
+            SimulationResult r;
+            r.mission_score = (i == 0) ? 90.0 : 80.0;
+            r.resolution_request_status = ResolutionRequestStatus::Accepted;
+            r.mission_results.push_back(MissionRunResult{
+                MissionRunStatus::Completed, static_cast<std::size_t>(i == 0 ? 5 : 7), {}});
+            return runReturning(r);
+        });
+
+    SimulationManager mgr(std::move(factory));
+    const fs::path out = freshDir("dm_mgr_exact");
+    const auto report = mgr.run(comp, out);
+
+    ASSERT_EQ(report.runs.size(), 3u);
+    EXPECT_DOUBLE_EQ(std::get<0>(report.score_range), 80.0); // -1 excluded from range
+    EXPECT_DOUBLE_EQ(std::get<1>(report.score_range), 90.0);
+    ASSERT_FALSE(report.runs[2].mission_results.empty()); // failed run keeps its detail
+    EXPECT_EQ(report.runs[2].mission_results[0].status, MissionRunStatus::Error);
+    ASSERT_FALSE(report.runs[2].mission_results[0].errors.empty());
+    EXPECT_EQ(report.runs[2].mission_results[0].errors[0].code, "RUN_CREATE_FAILED");
+
+    const YAML::Node root = YAML::LoadFile((out / "simulation_output.yaml").string());
+    ASSERT_EQ(root["runs"].size(), 3u);
+    EXPECT_EQ(root["runs"][0]["missions"][0]["steps"].as<std::size_t>(), 5u);
+    EXPECT_EQ(root["runs"][1]["missions"][0]["steps"].as<std::size_t>(), 7u);
+    EXPECT_DOUBLE_EQ(root["score_range"]["min"].as<double>(), 80.0);
+    EXPECT_DOUBLE_EQ(root["score_range"]["max"].as<double>(), 90.0);
+    EXPECT_EQ(root["runs"][2]["missions"][0]["errors"][0]["code"].as<std::string>(),
+              "RUN_CREATE_FAILED");
+    std::error_code ec;
+    fs::remove_all(out, ec);
+}
+
+// errors.txt is written IMMEDIATELY (flushed) with code AND message: the second run's
+// create() reads the log while the batch is still running and must already see the
+// first run's failure -- a deferred/buffered log or a detail-less line fails here.
+TEST(SimulationManager, ErrorsTxtImmediateWithCodeAndMessage) {
+    SimulationCompositionData comp;
+    comp.simulation_mission_groups = {{simCfg("a.npy"), {missionCfg()}}};
+    comp.drones = {droneCfg(), droneCfg()}; // 2 runs
+    comp.lidars = {lidarCfg()};
+
+    const fs::path out = freshDir("dm_mgr_log");
+    const fs::path log = out / "output_results" / "errors.txt";
+    std::string seen_mid_batch;
+    auto factory = std::make_unique<MockFactory>();
+    int call = 0;
+    EXPECT_CALL(*factory, create(_, _, _, _, _))
+        .Times(2)
+        .WillRepeatedly([&](const SimulationConfigData&, const MissionConfigData&,
+                            const DroneConfigData&, const LidarConfigData&,
+                            const fs::path&) -> std::unique_ptr<ISimulationRun> {
+            if (call++ == 0) throw std::runtime_error("distinctive-load-failure");
+            std::ifstream f(log); // mid-batch: run 0 already failed, batch still running
+            seen_mid_batch.assign(std::istreambuf_iterator<char>(f),
+                                  std::istreambuf_iterator<char>());
+            return runReturning(okResult());
+        });
+
+    SimulationManager mgr(std::move(factory));
+    (void)mgr.run(comp, out);
+
+    EXPECT_NE(seen_mid_batch.find("RUN_CREATE_FAILED"), std::string::npos) << seen_mid_batch;
+    EXPECT_NE(seen_mid_batch.find("distinctive-load-failure"), std::string::npos) << seen_mid_batch;
+    std::error_code ec;
+    fs::remove_all(out, ec);
+}
+
+// Every run gets its OWN numbered output directory: capture the paths handed to
+// create() and require run_0 / run_1, distinct, and existing on disk.
+TEST(SimulationManager, PerRunOutputDirsAreDistinct) {
+    SimulationCompositionData comp;
+    comp.simulation_mission_groups = {{simCfg("a.npy"), {missionCfg()}}};
+    comp.drones = {droneCfg(), droneCfg()};
+    comp.lidars = {lidarCfg()}; // 2 runs
+
+    std::vector<fs::path> run_dirs;
+    auto factory = std::make_unique<MockFactory>();
+    EXPECT_CALL(*factory, create(_, _, _, _, _))
+        .Times(2)
+        .WillRepeatedly([&](const SimulationConfigData&, const MissionConfigData&,
+                            const DroneConfigData&, const LidarConfigData&,
+                            const fs::path& p) -> std::unique_ptr<ISimulationRun> {
+            run_dirs.push_back(p);
+            return runReturning(okResult());
+        });
+
+    SimulationManager mgr(std::move(factory));
+    const fs::path out = freshDir("dm_mgr_dirs");
+    (void)mgr.run(comp, out);
+
+    ASSERT_EQ(run_dirs.size(), 2u);
+    EXPECT_NE(run_dirs[0], run_dirs[1]); // a collision would overwrite one run's map
+    EXPECT_EQ(run_dirs[0].filename(), "run_0");
+    EXPECT_EQ(run_dirs[1].filename(), "run_1");
+    EXPECT_TRUE(fs::exists(run_dirs[0]));
+    EXPECT_TRUE(fs::exists(run_dirs[1]));
+    std::error_code ec;
+    fs::remove_all(out, ec);
+}
+
+// The parser reads every field from ITS OWN key -- all values distinct so a crossed
+// key cannot coincide -- and dimensions_cm is a DIAMETER (radius = half).
+TEST(SimulationManager, ParserReadsFieldsFromCorrectKeys) {
+    const fs::path dir = freshDir("dm_parse_fields");
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    const auto write = [&](const char* name, const std::string& body) {
+        std::ofstream f(dir / name);
+        f << body;
+    };
+    write("compose.yaml",
+          "simulation_compositions:\n"
+          "  simulations:\n"
+          "    - simulation_config: \"sim.yaml\"\n"
+          "      mission_configs: [\"mission.yaml\"]\n"
+          "  drone_configs: [\"drone.yaml\"]\n"
+          "  lidar_configs: [\"lidar.yaml\"]\n");
+    write("sim.yaml", "simulation_config:\n  map_filename: \"m.npy\"\n  map_resolution_cm: 7\n");
+    write("mission.yaml", "mission_config:\n  max_steps: 123\n  gps_resolution_cm: 4\n");
+    write("drone.yaml",
+          "drone_config:\n  dimensions_cm: 10\n  max_rotate_deg: 11\n"
+          "  max_advance_cm: 22\n  max_elevate_cm: 33\n");
+    write("lidar.yaml",
+          "lidar_config:\n  z_min_cm: 6\n  z_max_cm: 300\n  d_cm: 2\n  fov_circles: 3\n");
+
+    const auto comp = parseCompositionYaml(dir / "compose.yaml");
+    ASSERT_EQ(comp.simulation_mission_groups.size(), 1u);
+    ASSERT_EQ(comp.drones.size(), 1u);
+    ASSERT_EQ(comp.lidars.size(), 1u);
+    EXPECT_DOUBLE_EQ(
+        std::get<0>(comp.simulation_mission_groups[0]).map_resolution.force_numerical_value_in(cm), 7.0);
+    EXPECT_EQ(std::get<1>(comp.simulation_mission_groups[0])[0].max_steps, 123u);
+    EXPECT_DOUBLE_EQ(
+        std::get<1>(comp.simulation_mission_groups[0])[0].gps_resolution.force_numerical_value_in(cm), 4.0);
+    EXPECT_DOUBLE_EQ(comp.drones[0].radius.force_numerical_value_in(cm), 5.0); // diameter 10
+    EXPECT_DOUBLE_EQ(comp.drones[0].max_rotate.force_numerical_value_in(deg), 11.0);
+    EXPECT_DOUBLE_EQ(comp.drones[0].max_advance.force_numerical_value_in(cm), 22.0);
+    EXPECT_DOUBLE_EQ(comp.drones[0].max_elevate.force_numerical_value_in(cm), 33.0);
+    EXPECT_DOUBLE_EQ(comp.lidars[0].z_min.force_numerical_value_in(cm), 6.0);
+    EXPECT_DOUBLE_EQ(comp.lidars[0].d.force_numerical_value_in(cm), 2.0);
+    EXPECT_EQ(comp.lidars[0].fov_circles, 3u);
+    fs::remove_all(dir, ec);
 }

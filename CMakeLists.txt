@@ -75,7 +75,10 @@ add_executable(drone_mapper_simulation_test
 )
 target_compile_definitions(drone_mapper_simulation_test
     PRIVATE
-        BENCHMARK_MAP_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data_maps/benchmark_map.npy")
+        BENCHMARK_MAP_PATH="${CMAKE_CURRENT_SOURCE_DIR}/data_maps/benchmark_map.npy"
+        MAPS_COMPARISON_EXE_PATH="$<TARGET_FILE:maps_comparison>")
+# The exe-contract tests spawn the real maps_comparison binary.
+add_dependencies(drone_mapper_simulation_test maps_comparison)
 target_link_libraries(drone_mapper_simulation_test
     PRIVATE
         drone_mapper

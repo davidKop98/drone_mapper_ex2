@@ -77,7 +77,9 @@ struct VoxelIndex {
     const double fz = std::floor(
         (pos.z.force_numerical_value_in(cm) - config.offset.z.force_numerical_value_in(cm)) / res + kSnapEpsilon);
 
-    if (fx < 0.0 || fy < 0.0 || fz < 0.0) {
+    // Negated >= so a NaN coordinate (all comparisons false) is rejected as
+    // out-of-bounds instead of falling through to an undefined size_t cast.
+    if (!(fx >= 0.0) || !(fy >= 0.0) || !(fz >= 0.0)) {
         return {};
     }
     if (fx >= static_cast<double>(shape[0]) ||

@@ -158,17 +158,86 @@ TEST(SimulationRun, GpsHeadingUnrounded) {
 
 // ---- MockMovement: ground-truth sphere collision ------------------------------
 
-TEST(SimulationRun, AdvanceIntoHiddenWallCrashesAndDoesNotMove) {
-    Map3DImpl hidden(makeArray(20, 5, 5, 0), mapCfg(10, 20, 5, 5)); // free space
-    hidden.set(P(105, 25, 25), VoxelOccupancy::Occupied);           // wall at cell 10
-    auto truth = makeTruth(55, 25, 25, 0, 0);                       // cell 5, facing +x
+// A wall strictly BETWEEN start and endpoint blocks the advance even though the
+// endpoint itself is clear: with radius 2 the endpoint box [53,57] sits in cell 5 and
+// the mutated coarse sweeps (endpoint-only, or 2*res stepping sampling x={15,35,55}
+// with boxes [13,17]/[33,37]/[53,57]) all straddle the wall cell x[20,30) -- only the
+// correct half-cell sweep samples inside it (x=20 box [18,22]).
+TEST(SimulationRun, AdvanceThroughThinWallBlocked) {
+    Map3DImpl hidden(makeArray(8, 5, 5, 0), mapCfg(10, 8, 5, 5)); // free space
+    hidden.set(P(25, 25, 25), VoxelOccupancy::Occupied);          // wall at cell 2, mid-path
+    auto truth = makeTruth(15, 25, 25, 0, 0);                     // cell 1, facing +x
     MockGPS exact(truth, 0.0 * cm);
     MockMovement mover(exact, hidden, 2.0 * cm);
 
-    const MovementResult r = mover.advance(60.0 * cm); // sweeps through the wall at x=100
+    const MovementResult r = mover.advance(40.0 * cm); // endpoint x=55 (cell 5) is clear
     EXPECT_FALSE(r.success);
     EXPECT_EQ(r.message, "DRONE_HITS_OBSTACLE");
-    EXPECT_DOUBLE_EQ(X(exact.position()), 55.0); // truth unchanged
+}
+
+// The endpoint itself lands inside a wall cell: blocked under any sweep variant.
+TEST(SimulationRun, AdvanceEndpointInWallBlocked) {
+    Map3DImpl hidden(makeArray(20, 5, 5, 0), mapCfg(10, 20, 5, 5));
+    hidden.set(P(105, 25, 25), VoxelOccupancy::Occupied); // wall at cell 10
+    auto truth = makeTruth(55, 25, 25, 0, 0);
+    MockGPS exact(truth, 0.0 * cm);
+    MockMovement mover(exact, hidden, 2.0 * cm);
+
+    const MovementResult r = mover.advance(50.0 * cm); // endpoint x=105, inside the wall
+    EXPECT_FALSE(r.success);
+    EXPECT_EQ(r.message, "DRONE_HITS_OBSTACLE");
+}
+
+// A blocked move must commit NOTHING: the exact truth and the rounded sibling view
+// both read exactly what they read before the attempt.
+TEST(SimulationRun, FailedAdvanceCommitsNothing) {
+    Map3DImpl hidden(makeArray(20, 5, 5, 0), mapCfg(10, 20, 5, 5));
+    hidden.set(P(105, 25, 25), VoxelOccupancy::Occupied);
+    auto truth = makeTruth(55, 25, 25, 0, 0);
+    MockGPS exact(truth, 0.0 * cm);
+    MockGPS rounded(exact.truth(), 10.0 * cm);
+    MockMovement mover(exact, hidden, 2.0 * cm);
+    const Position3D exact_before = exact.position();
+    const Position3D rounded_before = rounded.position();
+
+    const MovementResult r = mover.advance(60.0 * cm); // sweeps through the wall
+    EXPECT_FALSE(r.success);
+    EXPECT_DOUBLE_EQ(X(exact.position()), X(exact_before));
+    EXPECT_DOUBLE_EQ(Y(exact.position()), Y(exact_before));
+    EXPECT_DOUBLE_EQ(Z(exact.position()), Z(exact_before));
+    EXPECT_DOUBLE_EQ(X(rounded.position()), X(rounded_before));
+}
+
+// The wall never touches the movement CENTERLINE -- it clips the swept sphere only
+// through the radius term. Radius 8 at res 10 samples lateral offsets {0, +-4, +-8};
+// the wall cell y[10,20) starts 5cm below the centerline (y=25), and r/2 = 4 < 5 < 8 = r,
+// so honoring the full radius hits it (sample y = 25-8 = 17) while a zeroed or halved
+// radius sails past. The control wall at y[0,10) is 15cm away (> r): even the full
+// radius must NOT reach it, pinning the radius from above as well.
+TEST(SimulationRun, AdvanceBlockedWhenWallClipsRadiusOnly) {
+    { // wall at lateral distance d with r/2 < d < r: blocked, pose unchanged
+        Map3DImpl hidden(makeArray(6, 5, 5, 0), mapCfg(10, 6, 5, 5));
+        hidden.set(P(35, 15, 25), VoxelOccupancy::Occupied); // cell (3,1,2), face at y=20
+        auto truth = makeTruth(15, 25, 25, 0, 0);
+        MockGPS exact(truth, 0.0 * cm);
+        MockMovement mover(exact, hidden, 8.0 * cm);
+
+        const MovementResult r = mover.advance(30.0 * cm); // centerline y=25 stays clear
+        EXPECT_FALSE(r.success);
+        EXPECT_EQ(r.message, "DRONE_HITS_OBSTACLE");
+        EXPECT_DOUBLE_EQ(X(exact.position()), 15.0);
+    }
+    { // same move, wall at d > r: the radius must not over-reach either
+        Map3DImpl hidden(makeArray(6, 5, 5, 0), mapCfg(10, 6, 5, 5));
+        hidden.set(P(35, 5, 25), VoxelOccupancy::Occupied); // cell (3,0,2), face at y=10
+        auto truth = makeTruth(15, 25, 25, 0, 0);
+        MockGPS exact(truth, 0.0 * cm);
+        MockMovement mover(exact, hidden, 8.0 * cm);
+
+        const MovementResult r = mover.advance(30.0 * cm);
+        EXPECT_TRUE(r.success);
+        EXPECT_DOUBLE_EQ(X(exact.position()), 45.0);
+    }
 }
 
 TEST(SimulationRun, AdvanceThroughClearUpdatesTruthAndBothViews) {
@@ -202,19 +271,32 @@ TEST(SimulationRun, ElevateNegativeClearThenCeilingCrash) {
     EXPECT_DOUBLE_EQ(Z(exact.position()), 65.0); // unchanged after crash
 }
 
-TEST(SimulationRun, RotateAlwaysSucceedsAndUpdatesHeading) {
+// Left and Right rotations from a known heading produce the two DISTINCT expected
+// headings (free space -- direction sign only).
+TEST(SimulationRun, RotateDirectionSign) {
+    Map3DImpl hidden(makeArray(5, 5, 5, 0), mapCfg(10, 5, 5, 5)); // free space
+    auto truth = makeTruth(25, 25, 25, 90, 0);
+    MockGPS exact(truth, 0.0 * cm);
+    MockMovement mover(exact, hidden, 2.0 * cm);
+
+    EXPECT_TRUE(mover.rotate(RotationDirection::Left, O(30, 0).horizontal).success);
+    EXPECT_DOUBLE_EQ(H(exact.heading()), 120.0); // Left increases: 90 + 30
+
+    EXPECT_TRUE(mover.rotate(RotationDirection::Right, O(50, 0).horizontal).success);
+    EXPECT_DOUBLE_EQ(H(exact.heading()), 70.0); // Right decreases: 120 - 50
+}
+
+// A sphere is rotationally symmetric, so rotating NEVER collides -- here the sphere
+// is fully embedded in Occupied space and both directions must still succeed.
+TEST(SimulationRun, RotateNeverCollidesEvenTouchingWall) {
     Map3DImpl hidden(makeArray(5, 5, 5, 1), mapCfg(10, 5, 5, 5)); // walls everywhere
     auto truth = makeTruth(25, 25, 25, 90, 0);
     MockGPS exact(truth, 0.0 * cm);
     MockMovement mover(exact, hidden, 2.0 * cm);
 
-    const MovementResult left = mover.rotate(RotationDirection::Left, O(30, 0).horizontal);
-    EXPECT_TRUE(left.success);
-    EXPECT_DOUBLE_EQ(H(exact.heading()), 120.0); // 90 + 30
-
-    const MovementResult right = mover.rotate(RotationDirection::Right, O(50, 0).horizontal);
-    EXPECT_TRUE(right.success);
-    EXPECT_DOUBLE_EQ(H(exact.heading()), 70.0); // 120 - 50
+    EXPECT_TRUE(mover.rotate(RotationDirection::Left, O(30, 0).horizontal).success);
+    EXPECT_TRUE(mover.rotate(RotationDirection::Right, O(50, 0).horizontal).success);
+    EXPECT_DOUBLE_EQ(H(exact.heading()), 70.0); // both rotations landed
 }
 
 // Parity: a move the algorithm's (radius + gps/2) clearance approves must not

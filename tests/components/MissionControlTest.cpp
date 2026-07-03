@@ -113,7 +113,11 @@ TEST(MissionControl, ErrorShortCircuits) {
     const MissionRunResult r = mission.runMission();
     EXPECT_EQ(r.status, MissionRunStatus::Error);
     EXPECT_EQ(r.steps, 2u);
-    EXPECT_FALSE(r.errors.empty());
+    // The step's error DETAIL must be carried into the result, not just "an error":
+    // code identifies the source, message carries the drone's distinctive reason.
+    ASSERT_FALSE(r.errors.empty());
+    EXPECT_EQ(r.errors[0].code, "DRONE_STEP_ERROR");
+    EXPECT_EQ(r.errors[0].message, "DRONE_HITS_OBSTACLE");
     std::filesystem::remove(file);
 }
 

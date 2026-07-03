@@ -72,6 +72,9 @@ bool MockMovement::sweptSphereHitsOccupied(const Position3D& start, const Positi
     const double dy = Yc(end) - Yc(start);
     const double dz = Zc(end) - Zc(start);
     const double dist = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (!std::isfinite(dist)) {
+        return true; // non-finite pose/target: refuse the move instead of marching into UB
+    }
 
     // Sub-cell stepping along the path and a per-axis radius footprint box at each step,
     // matching the algorithm's clearance sampling so the two snap to the same voxels.

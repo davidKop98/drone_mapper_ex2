@@ -1,11 +1,11 @@
-// DroneControl is isolated with GMock'd IMappingAlgorithm / ILidar / IDroneMovement,
-// driving against real MockGPS views. The output map is scaffolding (DroneControl's
-// subject is step orchestration), so it is a FakeMap3D: Map3DImpl mutations cannot
-// fail this suite.
+// DroneControl is isolated with GMock'd IMappingAlgorithm / ILidar / IDroneMovement.
+// The output map and both GPS views are scaffolding (DroneControl's subject is step
+// orchestration), so they are FakeMap3D / FakeGps: Map3DImpl and MockGPS mutations
+// cannot fail this suite.
+#include "FakeGps.h"
 #include "FakeMap3D.h"
 
 #include <drone_mapper/DroneControlImpl.h>
-#include <drone_mapper/MockGPS.h>
 #include <drone_mapper/Units.h>
 #include <drone_mapper/types/DroneTypes.h>
 #include <drone_mapper/types/LidarTypes.h>
@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace {
 using namespace drone_mapper;
@@ -28,6 +29,7 @@ using ::testing::InSequence;
 using ::testing::IsNull;
 using ::testing::NotNull;
 using ::testing::Return;
+using drone_mapper::test_support::FakeGps;
 using drone_mapper::test_support::FakeMap3D;
 
 class MockMappingAlgorithm : public IMappingAlgorithm {
@@ -74,12 +76,6 @@ Position3D P(double x, double y, double z) {
 Orientation O(double h, double a) {
     return Orientation{h * horizontal_angle[deg], a * altitude_angle[deg]};
 }
-std::shared_ptr<GpsTruth> makeTruth(double x, double y, double z, double h) {
-    auto t = std::make_shared<GpsTruth>();
-    t->position = P(x, y, z);
-    t->heading = O(h, 0);
-    return t;
-}
 MovementCommand advanceCmd(double cm_) {
     return MovementCommand{MovementCommandType::Advance, RotationDirection::Left,
                            0.0 * horizontal_angle[deg], cm_ * cm};
@@ -93,9 +89,8 @@ TEST(DroneControl, MovementExecutedBeforeScan) {
     MockMappingAlgorithm algo(algo_map);
     MockLidarSensor lidar;
     MockDroneMovement movement;
-    auto truth = makeTruth(55, 25, 25, 0);
-    MockGPS exact(truth, 0.0 * cm);
-    MockGPS rounded(truth, 10.0 * cm);
+    FakeGps exact(P(55, 25, 25), O(0, 0));
+    FakeGps rounded(P(60, 30, 30), O(0, 0)); // what res-10 rounding would report
     DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
 
     MappingStepCommand cmd{advanceCmd(10), O(0, 0), AlgorithmStatus::Working};
@@ -116,9 +111,8 @@ TEST(DroneControl, AppliesScanFromExactOrigin) {
     MockMappingAlgorithm algo(algo_map);
     MockLidarSensor lidar;
     MockDroneMovement movement;
-    auto truth = makeTruth(252, 25, 25, 0); // exact 252, rounds to 250 @ res 5
-    MockGPS exact(truth, 0.0 * cm);
-    MockGPS rounded(truth, 5.0 * cm);
+    FakeGps exact(P(252, 25, 25), O(0, 0)); // exact 252; res-5 rounding would say 250
+    FakeGps rounded(P(250, 25, 25), O(0, 0));
     DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
 
     MappingStepCommand cmd{std::nullopt, O(0, 0), AlgorithmStatus::Working};
@@ -139,9 +133,8 @@ TEST(DroneControl, FailedMovementReturnsErrorAndSkipsScan) {
     MockMappingAlgorithm algo(algo_map);
     MockLidarSensor lidar;
     MockDroneMovement movement;
-    auto truth = makeTruth(55, 25, 25, 0);
-    MockGPS exact(truth, 0.0 * cm);
-    MockGPS rounded(truth, 10.0 * cm);
+    FakeGps exact(P(55, 25, 25), O(0, 0));
+    FakeGps rounded(P(60, 30, 30), O(0, 0)); // what res-10 rounding would report
     DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
 
     MappingStepCommand cmd{advanceCmd(10), O(0, 0), AlgorithmStatus::Working};
@@ -162,9 +155,8 @@ TEST(DroneControl, StatusMapping) {
         MockMappingAlgorithm algo(algo_map);
         MockLidarSensor lidar;
         MockDroneMovement movement;
-        auto truth = makeTruth(25, 25, 25, 0);
-        MockGPS exact(truth, 0.0 * cm);
-        MockGPS rounded(truth, 5.0 * cm);
+        FakeGps exact(P(25, 25, 25), O(0, 0));
+        FakeGps rounded(P(25, 25, 25), O(0, 0)); // already on the res-5 grid
         DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
 
         EXPECT_CALL(algo, nextStep(_, _))
@@ -183,9 +175,8 @@ TEST(DroneControl, LatestScanThreadedToNextStep) {
     MockMappingAlgorithm algo(algo_map);
     MockLidarSensor lidar;
     MockDroneMovement movement;
-    auto truth = makeTruth(55, 25, 25, 0);
-    MockGPS exact(truth, 0.0 * cm);
-    MockGPS rounded(truth, 10.0 * cm);
+    FakeGps exact(P(55, 25, 25), O(0, 0));
+    FakeGps rounded(P(60, 30, 30), O(0, 0)); // what res-10 rounding would report
     DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
 
     const LidarScanResult scan_a{LidarHit{30.0 * cm, O(0, 0)}};
@@ -207,4 +198,85 @@ TEST(DroneControl, LatestScanThreadedToNextStep) {
 
     ASSERT_EQ(captured.size(), 1u);
     EXPECT_DOUBLE_EQ(captured[0].distance.force_numerical_value_in(cm), 30.0);
+}
+
+// The algorithm must see BELIEF, not truth: the DroneState fed to nextStep is built
+// from the ROUNDED GPS view. Exact truth leaking here silently breaks the whole
+// gps_resolution design (the drone would plan with information it cannot have).
+// Also pins the step_index contract: consecutive steps feed 0, then 1.
+TEST(DroneControl, StateFedToAlgorithmIsRoundedView) {
+    FakeMap3D output(mapCfg(10, 10, 10, 10), 10, 10, 10);
+    FakeMap3D algo_map(mapCfg(10, 1, 1, 1), 1, 1, 1);
+    MockMappingAlgorithm algo(algo_map);
+    MockLidarSensor lidar;
+    MockDroneMovement movement;
+    FakeGps exact(P(252, 173, 91), O(0, 0));   // truth
+    FakeGps rounded(P(250, 175, 90), O(0, 0)); // res-5 rounding: distinct on EVERY axis
+    DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
+
+    std::vector<DroneState> seen;
+    EXPECT_CALL(algo, nextStep(_, _))
+        .Times(2)
+        .WillRepeatedly([&](const DroneState& s, const LidarScanResult*) {
+            seen.push_back(s);
+            return MappingStepCommand{std::nullopt, std::nullopt, AlgorithmStatus::Working};
+        });
+    (void)control.step();
+    (void)control.step();
+
+    ASSERT_EQ(seen.size(), 2u);
+    EXPECT_DOUBLE_EQ(seen[0].position.x.force_numerical_value_in(cm), 250.0);
+    EXPECT_DOUBLE_EQ(seen[0].position.y.force_numerical_value_in(cm), 175.0);
+    EXPECT_DOUBLE_EQ(seen[0].position.z.force_numerical_value_in(cm), 90.0);
+    EXPECT_EQ(seen[0].step_index, 0u);
+    EXPECT_EQ(seen[1].step_index, 1u);
+}
+
+// Heading-asymmetric twin of AppliesScanFromExactOrigin: at heading 90 the same 48cm
+// hit must land in +y (exact y 252 + 48 = 300 -> cell y 30). A zeroed/constant heading
+// in applyToMap would place it in +x instead and leave the +y cell Unmapped.
+TEST(DroneControl, AppliesScanFromExactOriginAtHeading90) {
+    FakeMap3D output(mapCfg(10, 5, 40, 5), 5, 40, 5);
+    FakeMap3D algo_map(mapCfg(10, 1, 1, 1), 1, 1, 1);
+    MockMappingAlgorithm algo(algo_map);
+    MockLidarSensor lidar;
+    MockDroneMovement movement;
+    FakeGps exact(P(25, 252, 25), O(90, 0));   // facing +y
+    FakeGps rounded(P(25, 250, 25), O(90, 0));
+    DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
+
+    MappingStepCommand cmd{std::nullopt, O(0, 0), AlgorithmStatus::Working};
+    EXPECT_CALL(algo, nextStep(_, _)).WillOnce(Return(cmd));
+    const LidarScanResult scan{LidarHit{48.0 * cm, O(0, 0)}}; // hit 48cm ahead
+    EXPECT_CALL(lidar, scan(_)).WillOnce(Return(scan));
+
+    (void)control.step();
+    EXPECT_EQ(output.atVoxel(P(25, 305, 25)), VoxelOccupancy::Occupied); // +y cell 30
+    EXPECT_NE(output.atVoxel(P(45, 255, 25)), VoxelOccupancy::Occupied); // +x stays clear
+}
+
+// The lidar is scanned at the COMMANDED orientation, not a default one: the algorithm
+// asks for (37, -12) -- non-zero and distinct on both axes so a dropped-orientation
+// mutation cannot coincide -- and lidar.scan must receive exactly that.
+TEST(DroneControl, ScanCommandOrientationPassedToLidar) {
+    FakeMap3D output(mapCfg(10, 10, 5, 5), 10, 5, 5);
+    FakeMap3D algo_map(mapCfg(10, 1, 1, 1), 1, 1, 1);
+    MockMappingAlgorithm algo(algo_map);
+    MockLidarSensor lidar;
+    MockDroneMovement movement;
+    FakeGps exact(P(55, 25, 25), O(0, 0));
+    FakeGps rounded(P(60, 30, 30), O(0, 0));
+    DroneControlImpl control(lidarCfg(), lidar, rounded, exact, movement, output, algo);
+
+    MappingStepCommand cmd{std::nullopt, O(37, -12), AlgorithmStatus::Working};
+    EXPECT_CALL(algo, nextStep(_, _)).WillOnce(Return(cmd));
+    Orientation seen = O(0, 0);
+    EXPECT_CALL(lidar, scan(_)).WillOnce([&](Orientation o) {
+        seen = o;
+        return LidarScanResult{};
+    });
+
+    (void)control.step();
+    EXPECT_DOUBLE_EQ(seen.horizontal.force_numerical_value_in(deg), 37.0);
+    EXPECT_DOUBLE_EQ(seen.altitude.force_numerical_value_in(deg), -12.0);
 }

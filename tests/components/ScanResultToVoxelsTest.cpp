@@ -2,7 +2,7 @@
 // Map3DImpl output map. We do not reimplement or modify the converter, and we do
 // not involve DroneControl (that is Step 4).
 #include <drone_mapper/Map3DImpl.h>
-#include <drone_mapper/MockGPS.h>
+#include "FakeGps.h"
 #include <drone_mapper/MockLidar.h>
 #include <drone_mapper/ScanResultToVoxels.h>
 #include <drone_mapper/Units.h>
@@ -147,11 +147,8 @@ TEST(ScanResultToVoxels, LidarToConverterToMapParity) {
     Map3DImpl hidden(unmappedArray(20, 5, 5), mapCfg(10.0));
     hidden.set(P(105, 25, 25), VoxelOccupancy::Occupied);
 
-    // Exact GPS view at a known position/heading; real MockLidar over the hidden map.
-    auto truth = std::make_shared<GpsTruth>();
-    truth->position = P(5, 25, 25);
-    truth->heading = O(0, 0);
-    MockGPS exact(truth, 0.0 * cm);
+    // Fixed pose source (the GPS is scaffolding here); real MockLidar over the hidden map.
+    test_support::FakeGps exact(P(5, 25, 25), O(0, 0));
     MockLidar lidar(lidarCfg(1, 300), hidden, exact);
 
     const LidarScanResult scan = lidar.scan(O(0, 0)); // straight at the wall
